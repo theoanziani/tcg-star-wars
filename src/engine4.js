@@ -82,8 +82,15 @@ function spawnFoes(list) {
   return autoFormation(list.map(r => r.replace('!', ''))).map((id, cell) => {
     if (!id) return null;
     const boss = !bossDone && id === bossId; if (boss) bossDone = true;
-    return new Unit(id, 'foe', cell, boss ? Math.min(5, mission.foeLvl + 1) : mission.foeLvl, boss);
+    const u = new Unit(id, 'foe', cell, boss ? Math.min(5, mission.foeLvl + 1) : mission.foeLvl, boss);
+    if (mission.boost > 1) boostUnit(u, mission.boost);
+    return u;
   }).filter(Boolean);
+}
+function boostUnit(u, b) {
+  u.hp = u.maxHp = Math.round(u.maxHp * b);
+  ['dmg', 'heal', 'reflectDmg', 'meleeDmg'].forEach(k => { if (u.def[k]) u.def[k] = Math.round(u.def[k] * b); });
+  u.refreshTag();
 }
 function emerge(u, delay, done) {
   later(delay, () => {
@@ -111,7 +118,8 @@ function startPrep(m) {
   mission = m; side = deckSide() === 'dark' ? 'dark' : 'light';
   clearScene(); applyPlanet(m.planet); state = 'prep'; waveIdx = 0;
   prepBoard = [...save.deck.board];
-  m.live = fitWaves(m, side, prepBoard); m.foeLvl = foeLvlFor(m, prepBoard);
+  if (m.survival) { m.boost = 1; m.live = [survivalWave(m, side, prepBoard, 1)]; }
+  else { m.live = fitWaves(m, side, prepBoard); m.foeLvl = foeLvlFor(m, prepBoard); }
   spawnAllies(prepBoard); foes = spawnFoes(m.live[0]);
   go('prep');
   boardUnits(allies).forEach((a, i) => emerge(a, 0.1 + i * 0.1));
@@ -128,18 +136,22 @@ function beginFight() {
   renderUlts(); go('battle'); state = 'opening'; $('.dock').hidden = false;
   units().forEach(u => { if (!u.ready) u.showNow(); });
   sfx.ignite(); if (units().some(u => u.model.saber)) sfx.humOn();
-  later(0.6, () => { showBanner(`Vague 1 / ${mission.live.length}`); state = 'fight'; });
+  later(0.6, () => { showBanner(waveTxt()); state = 'fight'; });
   updateWaveLabel();
 }
 const startMission = m => startPrep(m);
 function nextWave() {
   state = 'transition'; clearBolts();
   const waves = mission.live;
+  if (mission.survival) {
+    waves.push(survivalWave(mission, side, prepBoard, waveIdx + 2));
+    aliveAllies().forEach(a => heal(a, a.maxHp * DATA.rules.survival.heal));
+  }
   if (waveIdx + 1 >= waves.length) return win();
   waveIdx++;
   later(0.9, () => {
     foes.forEach((u, i) => tween(0.55, k => { u.group.position.y = 2.5 * k * k; u.card.rotation.z = k * 2; }, () => u.dispose(), i * 0.08));
-    showBanner(`Vague ${waveIdx + 1} / ${waves.length}`);
+    showBanner(waveTxt());
     foes = spawnFoes(waves[waveIdx]); updateWaveLabel();
     foes.forEach((u, i) => {
       const tx = u.group.position.x; u.group.position.x = tx + 8; u.card.rotation.z = Math.PI;
@@ -168,10 +180,27 @@ function win() {
 }
 function lose() {
   state = 'lose'; sfx.humOff(); sfx.retract(); sfx.lose();
+  if (mission.survival) return endSurvival();
   const gain = Math.round(mission.reward * DATA.rules.consolation);
   save.credits += gain; persist();
   later(1.3, () => showEnd(false, [`+${gain} crédits`], 0));
 }
+function endSurvival() {
+  const R = DATA.rules.survival, done = waveIdx, record = done > save.best;
+  const credits = done * R.credits, boosters = Math.floor(done / R.boosterEvery);
+  save.credits += credits; save.boosters += boosters; if (record) save.best = done; persist();
+  later(1.3, () => {
+    $('#endEyebrow').textContent = `Survie · record : ${save.best} vague${save.best > 1 ? 's' : ''}`;
+    $('#endTitle').textContent = record && done ? 'Nouveau record !' : 'Fin de la survie';
+    $('#endStars').hidden = true;
+    $('#endText').textContent = `Ton escouade a repoussé ${done} vague${done > 1 ? 's' : ''}. Chaque vague rapporte ${R.credits} crédits, et un booster toutes les ${R.boosterEvery} vagues.`;
+    $('#endRewards').innerHTML = [`+${credits} crédits`, ...(boosters ? [`+${boosters} booster${boosters > 1 ? 's' : ''}`] : [])].map(r => `<span>${r}</span>`).join('');
+    $('#stAlive').textContent = 0; $('#stParry').textContent = stats.parried; $('#stSkills').textContent = stats.skills;
+    $('#endNext').hidden = true; $('.dock').hidden = true;
+    $('#end').hidden = false; $('#endAgain').focus({ preventScroll: true });
+  });
+}
+const waveTxt = () => (mission.survival ? `Vague ${waveIdx + 1}` : `Vague ${waveIdx + 1} / ${mission.live.length}`);
 const nextMission = m => MISSIONS[MISSIONS.indexOf(m) + 1];
 function showEnd(won, rewards, stars) {
   const P = DATA.campaign[mission.pi], nm = nextMission(mission);
@@ -573,7 +602,7 @@ function tapUnit(x, y) {
 }
 function updateWaveLabel() {
   if (!mission) return;
-  $('#waveLabel').textContent = `${DATA.campaign[mission.pi].name} ${mission.i} · Vague ${waveIdx + 1} / ${mission.live.length}`;
+  $('#waveLabel').textContent = `${mission.survival ? 'Survie' : `${DATA.campaign[mission.pi].name} ${mission.i}`} · ${waveTxt()}`;
   const left = foes.filter(f => f.alive).length;
   $('#foesLabel').textContent = left ? `${left} ennemi${left > 1 ? 's' : ''} sur le plateau` : 'Vague repoussée';
 }

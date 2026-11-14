@@ -192,6 +192,27 @@ function fitWaves(m, sd, board) {
     return list;
   });
 }
+/* ================================================================
+   SURVIE : les vagues s'enchaînent jusqu'à la chute de l'escouade
+   ================================================================ */
+function survivalMission() {
+  const planets = DATA.campaign.map(P => P.id);
+  return { id: 'survie', survival: true, planet: pick(planets), pi: -1, i: 0, title: { light: 'Survie', dark: 'Survie' },
+    text: { light: 'Les vagues ne s\'arrêtent jamais. Tiens le plus longtemps possible.', dark: 'Les vagues ne s\'arrêtent jamais. Tiens le plus longtemps possible.' }, lvl: 1, reward: 0, live: [] };
+}
+/* Vague k : autant d'ennemis que tes personnages (+1 toutes les 5 vagues), raretés et niveau qui montent,
+   un chef toutes les 5 vagues ; au-delà du niveau 5, les ennemis gagnent 4 % de puissance par vague */
+function survivalWave(m, sd, board, k) {
+  const foeSide = id => CARDS[id].side !== sd, rank = id => RANKS.indexOf(CARDS[id].rarity);
+  const top = Math.min(4, Math.floor((k - 1) / 4));
+  const pool = UNIT_IDS.filter(id => foeSide(id) && !isUnique(id) && rank(id) <= top);
+  const n = Math.min(DATA.rules.deckUnits, boardUnits(board).length + Math.floor(k / 5));
+  const list = Array.from({ length: n }, () => pick(pool));
+  if (k % 5 === 0) { const chefs = UNIT_IDS.filter(id => foeSide(id) && isUnique(id) && rank(id) <= Math.min(4, k / 5)); list[0] = `${pick(chefs)}!`; }
+  m.foeLvl = clamp(teamLvl(board) + Math.floor((k - 1) / 5), 1, DATA.rules.maxLevel);
+  m.boost = 1 + DATA.rules.survival.boost * (k - 1);
+  return list;
+}
 const missionOpen = m => planetOpen(m.pi) && (m.i === 1 || !!save.won[`${m.planet}-${m.i - 1}`]);
 
 /* ================================================================
@@ -226,7 +247,7 @@ function roundRect(g, x, y, w, h, r) {
    SAUVEGARDE : compte claude.ai si disponible, sinon cet appareil
    ================================================================ */
 const KEY = 'tcg-star-wars-save-v1';
-const fresh = () => ({ v: 4, updatedAt: 0, credits: DATA.starter.credits, boosters: DATA.starter.boosters, owned: { ...DATA.starter.owned }, deck: { board: autoFormation(DATA.starter.deck) }, won: {}, seen: {} });
+const fresh = () => ({ v: 4, updatedAt: 0, credits: DATA.starter.credits, boosters: DATA.starter.boosters, owned: { ...DATA.starter.owned }, deck: { board: autoFormation(DATA.starter.deck) }, won: {}, seen: {}, best: 0 });
 function normalize(s) {
   const base = fresh();
   if (!s || typeof s !== 'object') return base;
@@ -247,7 +268,7 @@ function normalize(s) {
     boosters: nb,
     owned: Object.keys(owned).length ? owned : base.owned,
     deck: { board },
-    won, seen: { ...(s.seen || {}) },
+    won, seen: { ...(s.seen || {}) }, best: Math.max(0, Math.floor(Number(s.best) || 0)),
     refunded: refund || 0,
   };
 }

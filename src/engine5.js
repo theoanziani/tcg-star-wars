@@ -41,11 +41,13 @@ function refreshHub() {
   $('#mColl').textContent = `${ownedOf(UNIT_IDS)} / ${UNIT_IDS.length} personnages`;
   const p = deckProblem();
   $('#mDeck').textContent = p ? 'Deck à corriger' : `${sideLabel(s)} · ${boardUnits(save.deck.board).length} personnages`;
+  $('#mSurv').textContent = save.best ? `Record : ${save.best} vague${save.best > 1 ? 's' : ''}` : 'Des vagues sans fin : tiens le plus longtemps possible';
   const note = $('#refundNote'); note.hidden = !save.refunded;
   if (save.refunded) note.textContent = `Les cartes Capacités ont disparu : chaque personnage a maintenant les siennes. Tes anciennes capacités t'ont rapporté ${save.refunded} crédits.`;
 }
 function showHub() { refreshHub(); showHubScene(); }
 $$('[data-go]').forEach(b => b.addEventListener('click', () => { sfx.click(); go(b.dataset.go); }));
+$('#mSurvBtn').addEventListener('click', () => { sfx.click(); startPrep(survivalMission()); });
 addEventListener('pointerdown', () => sfx.init());
 addEventListener('keydown', () => sfx.init());
 
@@ -163,12 +165,16 @@ $('#dAuto').addEventListener('click', () => { save.deck.board = autoFormation(bo
 
 /* --- Préparation avant combat --- */
 function renderPrep() {
-  const P = DATA.campaign[mission.pi], W2 = mission.live;
-  $('#pTitle').textContent = `${P.name} ${mission.i} · ${mTitle(mission)}`;
+  const W2 = mission.live, back = $('#prep .back');
+  back.dataset.go = mission.survival ? 'hub' : 'missions'; back.textContent = mission.survival ? 'Retour au QG' : 'Retour à la carte';
+  $('#pTitle').textContent = mission.survival ? `Survie · record : ${save.best} vague${save.best > 1 ? 's' : ''}` : `${DATA.campaign[mission.pi].name} ${mission.i} · ${mTitle(mission)}`;
   $('#pBrief').textContent = mission.text[side];
   const names = W2[0].map(r => CARDS[r.replace('!', '')].name), cnt = {};
   names.forEach(n => (cnt[n] = (cnt[n] || 0) + 1));
-  $('#pFoes').textContent = `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.foeLvl}, autant que tes personnages. Vague 1 : ${Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ')}.${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
+  const first = `Vague 1 : ${Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ')}.`;
+  $('#pFoes').textContent = mission.survival
+    ? `Vagues sans fin, de plus en plus fortes, avec un chef toutes les 5 vagues. Entre deux vagues, tes survivants récupèrent ${pct(DATA.rules.survival.heal)} de leurs PV ; les personnages tombés ne reviennent pas. ${first}`
+    : `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.foeLvl}, autant que tes personnages. ${first}${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
   renderBoard($('#pBoard'), prepBoard, 'prep', b => rearrange(b));
   $('#pSave').disabled = prepBoard.every((id, i) => id === save.deck.board[i]);
 }

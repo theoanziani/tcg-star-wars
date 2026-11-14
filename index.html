@@ -360,6 +360,7 @@ button:focus-visible{outline:2px solid var(--ordre);outline-offset:2px}
     </div>
     <nav class="menu" aria-label="Menu du QG">
       <button class="mbtn primary" type="button" data-go="missions"><b>Campagne</b><span id="mMissions"></span></button>
+      <button class="mbtn" type="button" id="mSurvBtn"><b>Survie</b><span id="mSurv"></span></button>
       <button class="mbtn" type="button" data-go="booster" id="mBoosterBtn"><b>Boosters</b><span id="mBooster"></span></button>
       <button class="mbtn" type="button" data-go="collection"><b>Collection</b><span id="mColl"></span></button>
       <button class="mbtn" type="button" data-go="deck"><b>Deck</b><span id="mDeck"></span></button>
@@ -517,6 +518,8 @@ const DATA = {
     deckUnits: 8, cols: 4, rows: 4, levelBonus: 0.12, maxLevel: 5, consolation: 0.25, bossHp: 1.6,
     /* exemplaires nécessaires pour chaque niveau, et niveau où se débloque chaque capacité */
     levels: [1, 2, 3, 5, 8], unlock: [1, 3, 5], skillCd: 3, lowHp: 0.35, ultStart: 0.3,
+    /* survie : vagues sans fin, ennemis plus forts à chaque vague */
+    survival: { boost: 0.04, heal: 0.2, credits: 15, boosterEvery: 10 },
     booster: { label: 'Personnages', title: 'Héros de la Galaxie', size: 5, cost: 100, guarantee: 2 },
     refund: 30,
   },
@@ -820,7 +823,53 @@ DATA.campaign = [
         dark: 'Talen Rook est vaincu, la révolte brisée. Vessa Krell sourit : son maître, Morvain, t\'attend sur Varn-Toh, où des rebelles se terrent sous la glace.' },
     },
   },
-  { id: 'varn-toh', name: 'Varn-Toh', subtitle: 'Planète de glace', pos: [-2.4, 1.9], soon: true, teaser: 'Une base rebelle cachée sous la glace est assiégée.' },
+  { id: 'varn-toh', name: 'Varn-Toh', subtitle: 'Planète de glace', pos: [-2.4, 1.9],
+    teaser: 'Sous le glacier, la base Aurore abrite la dernière flotte rebelle du secteur. Elle est assiégée.',
+    pools: {
+      light: [['soldat-imperial', 'eclaireur-imperial', 'garde-patrouille', 'soldat-choc', 'droide-sonde'], ['tireur-imperial', 'artilleur-lourd', 'medic-imperial', 'pisteur', 'chasseur-novice', 'droide-combat'], ['commando-noir', 'garde-elite', 'acolyte-sith', 'droide-lourd', 'executeur']],
+      dark: [['soldat-rebelle', 'eclaireur-rebelle', 'artilleur-rebelle', 'infirmier-rebelle', 'droide-sonde'], ['initie-temple', 'gardien-temple', 'pisteur', 'droide-combat', 'mercenaire'], ['droide-lourd', 'commando-droide', 'chasseur-novice', 'cogneur', 'gardien-temple']],
+    },
+    chefs: { light: ['kessa-rho', 'kell-aric', 'aska-venn', 'taur-valen'], dark: ['jax-morrow', 'cass-wren', 'ryn-okoro', 'seyla-dorn'] },
+    missions: [
+      { t: 'L\'appel de la base Aurore', light: 'Un signal de détresse monte de sous la glace. Ouvre la route jusqu\'à la base.', dark: 'Un signal rebelle trahit la base. Remonte jusqu\'à sa source.' },
+      { t: 'Le col des Brumes', light: 'Une patrouille impériale bloque le col. Dégage-le.', dark: 'Des éclaireurs rebelles tiennent le col. Dégage-le.', focus: { light: ['eclaireur-imperial'], dark: ['eclaireur-rebelle'] } },
+      { t: 'Les sondes', light: 'Des droïdes sondes quadrillent la plaine. Abats-les avant qu\'ils trouvent la base.', dark: 'Les rebelles abattent tes droïdes sondes. Fais-les taire.', focus: { light: ['droide-sonde', 'droide-sonde'], dark: ['droide-sonde', 'droide-sonde'] } },
+      { t: 'Tempête blanche', light: 'Une tempête cache une colonne ennemie. Tiens bon jusqu\'à l\'éclaircie.', dark: 'Profite de la tempête pour frapper les avant-postes.' },
+      { t: { light: 'La traqueuse', dark: 'Le commando' }, light: 'Kessa Rho, traqueuse payée par l\'Empire, suit tes traces dans la neige.', dark: 'Le commando Jax Morrow sabote tes générateurs. Arrête-le.' },
+      { t: 'Le générateur de bouclier', light: 'Protège le générateur qui cache la base aux scanners.', dark: 'Détruis le générateur qui cache la base aux scanners.' },
+      { t: 'Les grottes de cristal', light: 'Des acolytes Sith fouillent les grottes de cristal.', dark: 'Des initiés Jedi cherchent des cristaux dans les grottes.', focus: { light: ['acolyte-sith', 'acolyte-sith'], dark: ['initie-temple', 'initie-temple'] } },
+      { t: 'Le pont de glace', light: 'L\'ennemi veut franchir le pont de glace. Fais-le reculer.', dark: 'Les rebelles défendent le pont de glace. Passe.' },
+      { t: 'Les blessés de l\'avant-poste', light: 'Évacue les blessés de l\'avant-poste nord.', dark: 'Prends l\'avant-poste nord avant l\'évacuation.', focus: { light: ['medic-imperial'], dark: ['infirmier-rebelle'] } },
+      { t: { light: 'L\'apprenti déchu', dark: 'L\'agent infiltré' }, light: 'Kell Aric, ancien padawan, veut ramener Kira à son nouveau maître.', dark: 'Cass Wren, espion rebelle, a percé tes codes. Démasque-le.' },
+      { t: 'La faille', light: 'Des soldats de choc descendent dans la faille.', dark: 'Des rebelles se terrent dans la faille.', focus: { light: ['soldat-choc', 'soldat-choc'], dark: ['artilleur-rebelle', 'artilleur-rebelle'] } },
+      { t: 'Le hangar gelé', light: 'Dégage le hangar pour que les cargos puissent décoller.', dark: 'Bloque le hangar avant le décollage des cargos.' },
+      { t: 'Chasseurs dans le blizzard', light: 'L\'Empire lâche des chasseurs de primes dans le blizzard.', dark: 'Les rebelles ont engagé des chasseurs pour te ralentir.', focus: { light: ['pisteur', 'chasseur-novice', 'pisteur'], dark: ['pisteur', 'chasseur-novice', 'pisteur'] } },
+      { t: 'Le lac noir', light: 'Une patrouille traverse le lac gelé. Brise sa marche.', dark: 'Les rebelles ont miné le lac gelé. Traverse quand même.' },
+      { t: { light: 'La chasseuse de Jedi', dark: 'Le commandant' }, light: 'Aska Venn traque Kira. Ses tirs contournent les sabres.', dark: 'Le commandant Ryn Okoro organise l\'évacuation. Arrête-le.' },
+      { t: 'Les canons de glace', light: 'Reprends les canons de défense avant l\'assaut final.', dark: 'Neutralise les canons de défense de la base.' },
+      { t: 'Le dernier convoi', light: 'Couvre le dernier convoi d\'évacuation.', dark: 'Intercepte le dernier convoi avant qu\'il atteigne les cargos.' },
+      { t: 'Les murs d\'Aurore', light: 'L\'ennemi est aux portes de la base Aurore. Personne ne passe.', dark: 'Enfonce les murs de la base Aurore.', focus: { light: ['garde-elite', 'executeur'], dark: ['gardien-temple', 'artilleur-rebelle'] } },
+      { t: 'Le cœur du glacier', light: 'Descends au cœur du glacier, là où l\'Inquisiteur attend Kira.', dark: 'Poursuis les fuyards jusqu\'au cœur du glacier.' },
+      { t: { light: 'L\'Inquisiteur', dark: 'La Chevalière' }, light: 'Taur Valen défie Kira. Affronte-le.', dark: 'Seyla Dorn couvre la fuite des rebelles. Abats-la.' },
+    ],
+    story: {
+      1: { title: 'La base Aurore',
+        light: 'Sous les glaces de Varn-Toh, la base Aurore abrite la dernière flotte rebelle du secteur. Elle vient d\'être repérée. Dara Holt et Kira arrivent à temps… mais Kira sent une présence froide rôder dans la tempête.',
+        dark: 'Varn-Toh cache la base Aurore, refuge de la flotte rebelle, et la padawan s\'y est réfugiée. L\'Inquisiteur Taur Valen dirige le siège ; tu en commandes l\'avant-garde.' },
+      5: { title: 'Une prime',
+        light: 'La traqueuse Kessa Rho est tombée. Sur elle, un contrat signé de l\'Empire, et une prime sur la tête de Kira.',
+        dark: 'Jax Morrow est capturé. Les rebelles savent que tu approches : la base Aurore se prépare au siège.' },
+      10: { title: 'Un visage connu',
+        light: 'Kell Aric a fui en jurant de revenir. Kira tremble : il était son ami au Temple, avant de choisir l\'ombre.',
+        dark: 'L\'espion Cass Wren est démasqué. Grâce à ses codes, tu connais désormais l\'entrée de la base.' },
+      15: { title: 'Le blizzard',
+        light: 'Aska Venn est vaincue, mais le blizzard se lève et l\'assaut final commence. Les cargos doivent partir, coûte que coûte.',
+        dark: 'Le commandant Okoro est tombé. Sans chef, la base Aurore lance une évacuation désespérée.' },
+      20: { title: 'L\'aube sur la glace',
+        light: 'Taur Valen recule, son sabre brisé. Les cargos décollent vers Draxis Prime, où l\'Empire fabrique une armée de droïdes. Kira sait désormais que Morvain la cherche.',
+        dark: 'Seyla Dorn tombe, et la base Aurore avec elle. Quelques cargos ont fui vers Draxis Prime, le monde-usine : Morvain t\'ordonne de les y suivre.' },
+    },
+  },
   { id: 'draxis', name: 'Draxis Prime', subtitle: 'Monde-usine de droïdes', pos: [0.6, -0.4], soon: true, teaser: 'Des chaînes de montage produisent une armée à saboter de l\'intérieur.' },
   { id: 'ossuria', name: 'Ossuria', subtitle: 'Désert de ruines Jedi', pos: [3.0, 2.2], soon: true, teaser: 'Une course aux reliques contre les Sith.' },
   { id: 'corvane', name: 'Corvane', subtitle: 'Lune-cité de la pègre', pos: [4.6, -1.8], soon: true, teaser: 'Les cartels se font la guerre ; l\'Empire attise les flammes.' },
@@ -1098,6 +1147,27 @@ function fitWaves(m, sd, board) {
     return list;
   });
 }
+/* ================================================================
+   SURVIE : les vagues s'enchaînent jusqu'à la chute de l'escouade
+   ================================================================ */
+function survivalMission() {
+  const planets = DATA.campaign.map(P => P.id);
+  return { id: 'survie', survival: true, planet: pick(planets), pi: -1, i: 0, title: { light: 'Survie', dark: 'Survie' },
+    text: { light: 'Les vagues ne s\'arrêtent jamais. Tiens le plus longtemps possible.', dark: 'Les vagues ne s\'arrêtent jamais. Tiens le plus longtemps possible.' }, lvl: 1, reward: 0, live: [] };
+}
+/* Vague k : autant d'ennemis que tes personnages (+1 toutes les 5 vagues), raretés et niveau qui montent,
+   un chef toutes les 5 vagues ; au-delà du niveau 5, les ennemis gagnent 4 % de puissance par vague */
+function survivalWave(m, sd, board, k) {
+  const foeSide = id => CARDS[id].side !== sd, rank = id => RANKS.indexOf(CARDS[id].rarity);
+  const top = Math.min(4, Math.floor((k - 1) / 4));
+  const pool = UNIT_IDS.filter(id => foeSide(id) && !isUnique(id) && rank(id) <= top);
+  const n = Math.min(DATA.rules.deckUnits, boardUnits(board).length + Math.floor(k / 5));
+  const list = Array.from({ length: n }, () => pick(pool));
+  if (k % 5 === 0) { const chefs = UNIT_IDS.filter(id => foeSide(id) && isUnique(id) && rank(id) <= Math.min(4, k / 5)); list[0] = `${pick(chefs)}!`; }
+  m.foeLvl = clamp(teamLvl(board) + Math.floor((k - 1) / 5), 1, DATA.rules.maxLevel);
+  m.boost = 1 + DATA.rules.survival.boost * (k - 1);
+  return list;
+}
 const missionOpen = m => planetOpen(m.pi) && (m.i === 1 || !!save.won[`${m.planet}-${m.i - 1}`]);
 
 /* ================================================================
@@ -1132,7 +1202,7 @@ function roundRect(g, x, y, w, h, r) {
    SAUVEGARDE : compte claude.ai si disponible, sinon cet appareil
    ================================================================ */
 const KEY = 'tcg-star-wars-save-v1';
-const fresh = () => ({ v: 4, updatedAt: 0, credits: DATA.starter.credits, boosters: DATA.starter.boosters, owned: { ...DATA.starter.owned }, deck: { board: autoFormation(DATA.starter.deck) }, won: {}, seen: {} });
+const fresh = () => ({ v: 4, updatedAt: 0, credits: DATA.starter.credits, boosters: DATA.starter.boosters, owned: { ...DATA.starter.owned }, deck: { board: autoFormation(DATA.starter.deck) }, won: {}, seen: {}, best: 0 });
 function normalize(s) {
   const base = fresh();
   if (!s || typeof s !== 'object') return base;
@@ -1153,7 +1223,7 @@ function normalize(s) {
     boosters: nb,
     owned: Object.keys(owned).length ? owned : base.owned,
     deck: { board },
-    won, seen: { ...(s.seen || {}) },
+    won, seen: { ...(s.seen || {}) }, best: Math.max(0, Math.floor(Number(s.best) || 0)),
     refunded: refund || 0,
   };
 }
@@ -1994,8 +2064,15 @@ function spawnFoes(list) {
   return autoFormation(list.map(r => r.replace('!', ''))).map((id, cell) => {
     if (!id) return null;
     const boss = !bossDone && id === bossId; if (boss) bossDone = true;
-    return new Unit(id, 'foe', cell, boss ? Math.min(5, mission.foeLvl + 1) : mission.foeLvl, boss);
+    const u = new Unit(id, 'foe', cell, boss ? Math.min(5, mission.foeLvl + 1) : mission.foeLvl, boss);
+    if (mission.boost > 1) boostUnit(u, mission.boost);
+    return u;
   }).filter(Boolean);
+}
+function boostUnit(u, b) {
+  u.hp = u.maxHp = Math.round(u.maxHp * b);
+  ['dmg', 'heal', 'reflectDmg', 'meleeDmg'].forEach(k => { if (u.def[k]) u.def[k] = Math.round(u.def[k] * b); });
+  u.refreshTag();
 }
 function emerge(u, delay, done) {
   later(delay, () => {
@@ -2023,7 +2100,8 @@ function startPrep(m) {
   mission = m; side = deckSide() === 'dark' ? 'dark' : 'light';
   clearScene(); applyPlanet(m.planet); state = 'prep'; waveIdx = 0;
   prepBoard = [...save.deck.board];
-  m.live = fitWaves(m, side, prepBoard); m.foeLvl = foeLvlFor(m, prepBoard);
+  if (m.survival) { m.boost = 1; m.live = [survivalWave(m, side, prepBoard, 1)]; }
+  else { m.live = fitWaves(m, side, prepBoard); m.foeLvl = foeLvlFor(m, prepBoard); }
   spawnAllies(prepBoard); foes = spawnFoes(m.live[0]);
   go('prep');
   boardUnits(allies).forEach((a, i) => emerge(a, 0.1 + i * 0.1));
@@ -2040,18 +2118,22 @@ function beginFight() {
   renderUlts(); go('battle'); state = 'opening'; $('.dock').hidden = false;
   units().forEach(u => { if (!u.ready) u.showNow(); });
   sfx.ignite(); if (units().some(u => u.model.saber)) sfx.humOn();
-  later(0.6, () => { showBanner(`Vague 1 / ${mission.live.length}`); state = 'fight'; });
+  later(0.6, () => { showBanner(waveTxt()); state = 'fight'; });
   updateWaveLabel();
 }
 const startMission = m => startPrep(m);
 function nextWave() {
   state = 'transition'; clearBolts();
   const waves = mission.live;
+  if (mission.survival) {
+    waves.push(survivalWave(mission, side, prepBoard, waveIdx + 2));
+    aliveAllies().forEach(a => heal(a, a.maxHp * DATA.rules.survival.heal));
+  }
   if (waveIdx + 1 >= waves.length) return win();
   waveIdx++;
   later(0.9, () => {
     foes.forEach((u, i) => tween(0.55, k => { u.group.position.y = 2.5 * k * k; u.card.rotation.z = k * 2; }, () => u.dispose(), i * 0.08));
-    showBanner(`Vague ${waveIdx + 1} / ${waves.length}`);
+    showBanner(waveTxt());
     foes = spawnFoes(waves[waveIdx]); updateWaveLabel();
     foes.forEach((u, i) => {
       const tx = u.group.position.x; u.group.position.x = tx + 8; u.card.rotation.z = Math.PI;
@@ -2080,10 +2162,27 @@ function win() {
 }
 function lose() {
   state = 'lose'; sfx.humOff(); sfx.retract(); sfx.lose();
+  if (mission.survival) return endSurvival();
   const gain = Math.round(mission.reward * DATA.rules.consolation);
   save.credits += gain; persist();
   later(1.3, () => showEnd(false, [`+${gain} crédits`], 0));
 }
+function endSurvival() {
+  const R = DATA.rules.survival, done = waveIdx, record = done > save.best;
+  const credits = done * R.credits, boosters = Math.floor(done / R.boosterEvery);
+  save.credits += credits; save.boosters += boosters; if (record) save.best = done; persist();
+  later(1.3, () => {
+    $('#endEyebrow').textContent = `Survie · record : ${save.best} vague${save.best > 1 ? 's' : ''}`;
+    $('#endTitle').textContent = record && done ? 'Nouveau record !' : 'Fin de la survie';
+    $('#endStars').hidden = true;
+    $('#endText').textContent = `Ton escouade a repoussé ${done} vague${done > 1 ? 's' : ''}. Chaque vague rapporte ${R.credits} crédits, et un booster toutes les ${R.boosterEvery} vagues.`;
+    $('#endRewards').innerHTML = [`+${credits} crédits`, ...(boosters ? [`+${boosters} booster${boosters > 1 ? 's' : ''}`] : [])].map(r => `<span>${r}</span>`).join('');
+    $('#stAlive').textContent = 0; $('#stParry').textContent = stats.parried; $('#stSkills').textContent = stats.skills;
+    $('#endNext').hidden = true; $('.dock').hidden = true;
+    $('#end').hidden = false; $('#endAgain').focus({ preventScroll: true });
+  });
+}
+const waveTxt = () => (mission.survival ? `Vague ${waveIdx + 1}` : `Vague ${waveIdx + 1} / ${mission.live.length}`);
 const nextMission = m => MISSIONS[MISSIONS.indexOf(m) + 1];
 function showEnd(won, rewards, stars) {
   const P = DATA.campaign[mission.pi], nm = nextMission(mission);
@@ -2485,7 +2584,7 @@ function tapUnit(x, y) {
 }
 function updateWaveLabel() {
   if (!mission) return;
-  $('#waveLabel').textContent = `${DATA.campaign[mission.pi].name} ${mission.i} · Vague ${waveIdx + 1} / ${mission.live.length}`;
+  $('#waveLabel').textContent = `${mission.survival ? 'Survie' : `${DATA.campaign[mission.pi].name} ${mission.i}`} · ${waveTxt()}`;
   const left = foes.filter(f => f.alive).length;
   $('#foesLabel').textContent = left ? `${left} ennemi${left > 1 ? 's' : ''} sur le plateau` : 'Vague repoussée';
 }
@@ -2564,11 +2663,13 @@ function refreshHub() {
   $('#mColl').textContent = `${ownedOf(UNIT_IDS)} / ${UNIT_IDS.length} personnages`;
   const p = deckProblem();
   $('#mDeck').textContent = p ? 'Deck à corriger' : `${sideLabel(s)} · ${boardUnits(save.deck.board).length} personnages`;
+  $('#mSurv').textContent = save.best ? `Record : ${save.best} vague${save.best > 1 ? 's' : ''}` : 'Des vagues sans fin : tiens le plus longtemps possible';
   const note = $('#refundNote'); note.hidden = !save.refunded;
   if (save.refunded) note.textContent = `Les cartes Capacités ont disparu : chaque personnage a maintenant les siennes. Tes anciennes capacités t'ont rapporté ${save.refunded} crédits.`;
 }
 function showHub() { refreshHub(); showHubScene(); }
 $$('[data-go]').forEach(b => b.addEventListener('click', () => { sfx.click(); go(b.dataset.go); }));
+$('#mSurvBtn').addEventListener('click', () => { sfx.click(); startPrep(survivalMission()); });
 addEventListener('pointerdown', () => sfx.init());
 addEventListener('keydown', () => sfx.init());
 
@@ -2686,12 +2787,16 @@ $('#dAuto').addEventListener('click', () => { save.deck.board = autoFormation(bo
 
 /* --- Préparation avant combat --- */
 function renderPrep() {
-  const P = DATA.campaign[mission.pi], W2 = mission.live;
-  $('#pTitle').textContent = `${P.name} ${mission.i} · ${mTitle(mission)}`;
+  const W2 = mission.live, back = $('#prep .back');
+  back.dataset.go = mission.survival ? 'hub' : 'missions'; back.textContent = mission.survival ? 'Retour au QG' : 'Retour à la carte';
+  $('#pTitle').textContent = mission.survival ? `Survie · record : ${save.best} vague${save.best > 1 ? 's' : ''}` : `${DATA.campaign[mission.pi].name} ${mission.i} · ${mTitle(mission)}`;
   $('#pBrief').textContent = mission.text[side];
   const names = W2[0].map(r => CARDS[r.replace('!', '')].name), cnt = {};
   names.forEach(n => (cnt[n] = (cnt[n] || 0) + 1));
-  $('#pFoes').textContent = `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.foeLvl}, autant que tes personnages. Vague 1 : ${Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ')}.${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
+  const first = `Vague 1 : ${Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ')}.`;
+  $('#pFoes').textContent = mission.survival
+    ? `Vagues sans fin, de plus en plus fortes, avec un chef toutes les 5 vagues. Entre deux vagues, tes survivants récupèrent ${pct(DATA.rules.survival.heal)} de leurs PV ; les personnages tombés ne reviennent pas. ${first}`
+    : `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.foeLvl}, autant que tes personnages. ${first}${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
   renderBoard($('#pBoard'), prepBoard, 'prep', b => rearrange(b));
   $('#pSave').disabled = prepBoard.every((id, i) => id === save.deck.board[i]);
 }
