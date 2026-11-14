@@ -81,6 +81,7 @@ function applyPlanet(id) {
   for (let i = 0; i < 40; i++) { g.beginPath(); g.ellipse(rand(0, 512), rand(0, 256), rand(10, 60), rand(2, 6), 0, 0, Math.PI * 2); g.fill(); }
   planetTex.needsUpdate = true;
   dust.cfg = P.dust; dust.mat.color.set(P.dust.color); dust.geo.setDrawRange(0, P.dust.n);
+  showTerrain(id);
 }
 function updateDust(dt, t) {
   const c = dust.cfg; if (!c) return;

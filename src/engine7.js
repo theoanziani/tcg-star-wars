@@ -1,31 +1,54 @@
 /* ================================================================
    CAMÉRA ET BOUCLE
    ================================================================ */
-const cam = { yaw: 0.42, base: 0.42, dist: 9, height: 5.5, lookY: 0, lookZ: 0 };
+/* QG : vue plongeante d'origine. Combat : vue de côté cinématique (3/4 sur écran étroit) */
+const cam = { off: 0, hub: {}, side: {} };
 function resize() {
   W = innerWidth; H = innerHeight; renderer.setSize(W, H, false); composer.setSize(W, H);
   const a = W / H;
-  if (a < 0.62) Object.assign(cam, { dist: 15.5, height: 15, lookY: -2.8, lookZ: 1.2, base: 0 }), (camera.fov = 56);
-  else if (a < 1.05) Object.assign(cam, { dist: 14, height: 12, lookY: -1.9, lookZ: 0.9, base: 0.2 }), (camera.fov = 50);
-  else Object.assign(cam, { dist: 12.2, height: 9.4, lookY: -1.4, lookZ: 0.8, base: 0.15 }), (camera.fov = 44);
-  cam.yaw = cam.base; camera.aspect = a; camera.updateProjectionMatrix();
+  if (a < 0.62) { cam.hub = { yaw: 0, dist: 15.5, height: 15 }; cam.side = { yaw: 0.32, dist: 13, height: 10, look: new V3(), fov: 56 }; camera.fov = 56; }
+  else if (a < 1.05) { cam.hub = { yaw: 0.2, dist: 14, height: 12 }; cam.side = { yaw: 1.0, dist: 13, height: 6.5, look: new V3(), fov: 50 }; camera.fov = 50; }
+  else { cam.hub = { yaw: 0.15, dist: 12.2, height: 9.4 }; cam.side = { yaw: Math.PI / 2 - 0.2, dist: 10.6, height: 4.4, look: new V3(), fov: 44 }; camera.fov = 44; }
+  camera.aspect = a; camera.updateProjectionMatrix();
+  fitSide();
   resizeBooster(a); resizeGalaxy(a);
+}
+/* Cadrage auto : on cherche le point visé et le recul minimal pour que tout le plateau
+   (deux camps, figurines comprises) tienne entre le bandeau du haut et la barre du bas */
+function fitSide() {
+  const C = cam.side, k = C.height / C.dist, ex = 1.5 * 1.2 + 0.45, ez = 1.05 + 3 * 1.42 + 0.6, v = new V3(), look = new V3();
+  const corners = [-1, 1].flatMap(x => [-1, 1].flatMap(z => [0, 1.7].map(y => new V3(x * ex, y, z * ez))));
+  const fits = d => { camera.position.copy(look).add(new V3(Math.sin(C.yaw) * d, k * d, Math.cos(C.yaw) * d)); camera.lookAt(look); camera.updateMatrixWorld();
+    return corners.every(c => { v.copy(c).project(camera); return Math.abs(v.x) < 0.94 && v.y > -0.72 && v.y < 0.8; }); };
+  let best = { d: 45, y: 0, z: 0 };
+  for (let ly = -3; ly <= 3; ly += 0.5) for (let lz = -3; lz <= 3; lz += 0.5) {
+    look.set(0, ly, lz);
+    for (let d = 5; d < best.d; d *= 1.03) if (fits(d)) { best = { d, y: ly, z: lz }; break; }
+  }
+  C.fit = best.d; C.look = new V3(0, best.y, best.z);
 }
 addEventListener('resize', resize); resize();
 let drag = null;
 const SPECIAL = { booster: (t, e) => boosterPointer(t, e), missions: (t, e) => galaxyPointer(t, e) };
-canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); if (SPECIAL[screen]) return SPECIAL[screen]('down', e); drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, moved: 0 }; });
-canvas.addEventListener('pointermove', e => { if (SPECIAL[screen]) return SPECIAL[screen]('move', e); if (drag) { drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); cam.yaw = clamp(drag.yaw - (e.clientX - drag.x) * 0.006, -0.9, 0.9); } });
+canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); if (SPECIAL[screen]) return SPECIAL[screen]('down', e); drag = { x: e.clientX, y: e.clientY, off: cam.off, moved: 0 }; });
+canvas.addEventListener('pointermove', e => { if (SPECIAL[screen]) return SPECIAL[screen]('move', e); if (drag) { drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); cam.off = clamp(drag.off - (e.clientX - drag.x) * 0.006, -0.9, 0.9); } });
 canvas.addEventListener('pointerup', e => { if (SPECIAL[screen]) return SPECIAL[screen]('up', e); if (drag && drag.moved < 8 && screen === 'battle') tapUnit(e.clientX, e.clientY); drag = null; });
 canvas.addEventListener('pointercancel', e => { if (SPECIAL[screen]) return SPECIAL[screen]('up', e); drag = null; });
 function updateCamera(dt, t) {
-  const hub = screen !== 'battle' && screen !== 'prep', wide = W > 720;
-  const yaw = cam.yaw + (hub && !reduceMotion && !drag ? Math.sin(t * 0.12) * 0.3 : 0);
-  const big = !hub && mission && mission.deckKey === 'board16' ? 1.14 : 1; /* plateau plein : un peu plus de recul */
-  const dist = hub ? cam.dist * 0.6 : cam.dist * big, height = hub ? cam.height * 0.48 : cam.height * big;
-  const drift = reduceMotion ? 0 : Math.sin(t * 0.25) * 0.12;
-  const look = hub ? new V3(wide ? -1.6 : 0, 0.5, PLAYER_Z + (wide ? 0 : 0.6)) : new V3(screen === 'prep' && wide ? -2.4 : 0, cam.lookY, cam.lookZ);
-  const pos = new V3(Math.sin(yaw) * dist + drift, height, Math.cos(yaw) * dist + (hub ? PLAYER_Z * 0.6 : 0));
+  const hub = screen !== 'battle' && screen !== 'prep', wide = W > 720, still = reduceMotion || drag;
+  let look, pos;
+  if (hub) {
+    const C = cam.hub, yaw = C.yaw + cam.off + (still ? 0 : Math.sin(t * 0.12) * 0.3), drift = reduceMotion ? 0 : Math.sin(t * 0.25) * 0.12;
+    look = new V3(wide ? -1.6 : 0, 0.5, PLAYER_Z + (wide ? 0 : 0.6));
+    pos = new V3(Math.sin(yaw) * C.dist * 0.6 + drift, C.height * 0.48, Math.cos(yaw) * C.dist * 0.6 + PLAYER_Z * 0.6);
+  } else {
+    /* de profil : ton escouade à gauche, l'ennemi à droite ; léger travelling */
+    const C = cam.side, d = C.fit, k = C.height / C.dist;
+    const yaw = C.yaw + cam.off + (still ? 0 : Math.sin(t * 0.09) * 0.05);
+    look = C.look.clone();
+    if (screen === 'prep') { if (wide) look.z += 3.4; else look.y -= d * 0.3; }
+    pos = look.clone().add(new V3(Math.sin(yaw) * d, k * d, Math.cos(yaw) * d + (reduceMotion ? 0 : Math.sin(t * 0.2) * 0.4)));
+  }
   if (camFx.t > 0 && screen === 'battle') { camFx.t -= dt; const w = Math.min(1, camFx.t * 2) * 0.35; look.lerp(camFx.at, w); pos.lerp(camFx.at, w * 0.3); }
   camera.position.copy(pos);
   if (!reduceMotion && shake > 0.001) camera.position.add(new V3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).multiplyScalar(shake));
