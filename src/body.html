@@ -1,0 +1,163 @@
+<canvas id="scene" aria-label="Plateau de jeu en 3D"></canvas>
+<div id="flash"></div>
+<div id="labels"></div>
+
+<div class="tools">
+  <button class="tool" id="muteBtn" type="button" aria-pressed="false">Couper le son</button>
+  <button class="tool" id="quitBtn" type="button" hidden>Abandonner</button>
+</div>
+
+<!-- QG -->
+<section id="hub" class="hub safe" aria-label="QG">
+  <div class="hub-side">
+    <div class="hub-head">
+      <span class="eyebrow">TCG Star Wars · série 1</span>
+      <h1 id="hubTitle">QG de l'Alliance</h1>
+      <div class="res">
+        <div class="chip"><span>Crédits</span><b id="credits">0</b></div>
+        <div class="chip"><span>Boosters</span><b id="boosterCount">0</b></div>
+        <div class="chip"><span>Personnages</span><b id="persoCount">0</b></div>
+        <div class="chip"><span>Étoiles</span><b id="starCount">0</b></div>
+      </div>
+    </div>
+    <nav class="menu" aria-label="Menu du QG">
+      <button class="mbtn primary" type="button" data-go="missions"><b>Campagne</b><span id="mMissions"></span></button>
+      <button class="mbtn" type="button" data-go="booster" id="mBoosterBtn"><b>Boosters</b><span id="mBooster"></span></button>
+      <button class="mbtn" type="button" data-go="collection"><b>Collection</b><span id="mColl"></span></button>
+      <button class="mbtn" type="button" data-go="deck"><b>Deck</b><span id="mDeck"></span></button>
+    </nav>
+  </div>
+  <p class="note" id="refundNote" hidden></p>
+  <p class="savenote" id="saveNote">Sauvegarde sur cet appareil.</p>
+</section>
+
+<!-- Carte de la galaxie -->
+<section id="missions" class="screen galaxy safe" hidden aria-labelledby="mTitle">
+  <div class="sbar"><button class="back" type="button" data-go="hub">Retour au QG</button><h2 id="mTitle">Carte de la galaxie</h2><span class="sidechip" id="mSide"></span></div>
+  <div id="gLabels" class="glabels"></div>
+  <aside class="gpanel" id="gPanel" aria-live="polite">
+    <span class="eyebrow" id="gSub"></span>
+    <h3 id="gName"></h3>
+    <p class="gteaser" id="gTeaser"></p>
+    <div class="gprog"><div class="prog"><i id="gProg"></i></div><span id="gProgN"></span></div>
+    <div class="gnodes" id="gNodes"></div>
+    <div class="gmission" id="gMission">
+      <span class="eyebrow" id="gmNum"></span>
+      <h4 id="gmTitle"></h4>
+      <p id="gmText"></p>
+      <div class="meta" id="gmMeta"></div>
+      <button class="cta" id="gmGo" type="button">Préparer la mission</button>
+    </div>
+  </aside>
+</section>
+
+<!-- Boosters (scène 3D) -->
+<section id="booster" class="screen booster3d safe" hidden aria-labelledby="bTitle">
+  <div class="sbar"><button class="back" type="button" data-go="hub" id="bBack">Retour au QG</button><h2 id="bTitle">Boosters</h2><div class="chip"><span>Crédits</span><b id="bCredits">0</b></div></div>
+  <div class="bstage3d"></div>
+  <div class="bui">
+    <p class="bhint" id="bHint"></p>
+    <div class="bkinds" id="bKinds" role="group" aria-label="Choisir le booster"></div>
+    <div class="bactions">
+      <button class="cta" id="tearBtn" type="button">Déchirer le paquet</button>
+      <button class="ghost gold" id="buyBtn" type="button"></button>
+      <button class="cta" id="nextBtn" type="button" hidden>Retourner la carte</button>
+      <button class="ghost" id="flipAllBtn" type="button" hidden>Tout retourner</button>
+      <button class="cta" id="againBtn" type="button" hidden>Ouvrir le suivant</button>
+      <button class="ghost" id="doneBtn" type="button" hidden>Terminer</button>
+    </div>
+    <p class="warn" id="bMsg" hidden></p>
+  </div>
+  <div id="bBadges" class="bbadges" aria-live="polite"></div>
+  <div id="bLegend" class="blegend" aria-live="assertive"></div>
+  <div id="bFlash" class="bflash"></div>
+</section>
+
+<!-- Collection -->
+<section id="collection" class="screen safe" hidden aria-labelledby="cTitle">
+  <div class="sbar"><button class="back" type="button" data-go="hub">Retour au QG</button><h2 id="cTitle">Collection</h2></div>
+  <div class="sbody"><div class="chips" id="collChips"></div><div id="collBody"></div></div>
+</section>
+
+<!-- Deck -->
+<section id="deck" class="screen safe" hidden aria-labelledby="dTitle">
+  <div class="sbar"><button class="back" type="button" data-go="hub">Retour au QG</button><h2 id="dTitle">Deck</h2><span class="sidechip" id="dSide"></span></div>
+  <div class="sbody">
+    <div class="section-title">Composition de base · <span id="dUnitsN"></span> personnages · la ligne avant fait face à l'ennemi</div>
+    <div class="boardwrap">
+      <div class="board" id="dBoard"></div>
+      <div class="boardside"><p class="hint">Touche une carte puis une case pour la déplacer ou l'échanger. La ligne avant encaisse la plupart des tirs : place-y tes protecteurs et tes utilisateurs de la Force.</p><div class="row"><button class="ghost" id="dAuto" type="button">Placement automatique</button><button class="ghost" id="dRemove" type="button" hidden>Retirer la carte</button></div></div>
+    </div>
+    <p class="warn" id="dWarn" hidden></p>
+    <div class="section-title">Ta collection · touche une carte pour l'ajouter (les personnages nommés sont uniques)</div>
+    <div class="chips" id="poolChips"></div>
+    <div class="grid" id="dPool"></div>
+  </div>
+</section>
+
+<!-- Préparation avant combat -->
+<section id="prep" class="screen see-through prep safe" hidden aria-labelledby="pTitle">
+  <div class="sbar"><button class="back" type="button" data-go="missions">Retour à la carte</button><h2 id="pTitle">Préparation</h2></div>
+  <div class="sbody"><div class="prep-panel">
+    <span class="eyebrow">Avant l'affrontement</span>
+    <p class="brief" id="pBrief"></p>
+    <p id="pFoes"></p>
+    <div class="board" id="pBoard"></div>
+    <p class="hint">Touche une carte puis une case pour adapter ta composition à cette vague.</p>
+    <div class="row"><button class="cta" id="pFight" type="button">Commencer le combat</button><button class="ghost" id="pAuto" type="button">Placement auto</button></div>
+    <div class="row"><button class="ghost" id="pReset" type="button">Revenir à la base</button><button class="ghost" id="pSave" type="button">Enregistrer comme base</button></div>
+  </div></div>
+</section>
+
+<!-- Fiche carte -->
+<div id="cardModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="cmName">
+  <div class="mcard">
+    <img id="cmImg" alt="">
+    <div class="info">
+      <span class="eyebrow" id="cmRarity"></span>
+      <h3 id="cmName"></h3>
+      <span class="meta2" id="cmMeta"></span>
+      <p id="cmText"></p>
+      <ul class="skills" id="cmSkills"></ul>
+      <p class="bio" id="cmBio"></p>
+      <p id="cmLevel"></p>
+      <div class="prog"><i id="cmProg"></i></div>
+      <p class="warn" id="cmMsg" hidden></p>
+      <div class="row"><button class="cta" id="cmDeck" type="button">Ajouter au deck</button><button class="ghost" id="cmRemove" type="button" hidden>Retirer du deck</button><button class="ghost" id="cmClose" type="button">Fermer</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Combat -->
+<div id="battleHud" hidden>
+  <header class="top">
+    <div class="chip"><b id="waveLabel"></b><span id="foesLabel"></span></div>
+    <div class="buffs" id="buffs"></div>
+  </header>
+  <div id="banner" class="banner" aria-live="polite"></div>
+  <footer class="dock">
+    <p class="ulthint" id="ultHint"></p>
+    <div class="ults" id="ults"></div>
+  </footer>
+</div>
+
+<section id="end" class="panel" hidden aria-labelledby="endTitle">
+  <span class="eyebrow" id="endEyebrow"></span>
+  <h2 id="endTitle"></h2>
+  <div class="stars" id="endStars"></div>
+  <p id="endText"></p>
+  <div class="rewards" id="endRewards"></div>
+  <div class="stats">
+    <div><b id="stAlive">0</b><span>alliés debout</span></div>
+    <div><b id="stParry">0</b><span>tirs parés</span></div>
+    <div><b id="stSkills">0</b><span>capacités déclenchées</span></div>
+  </div>
+  <div class="row"><button class="cta" id="endNext" type="button">Mission suivante</button><button class="ghost" id="endAgain" type="button">Rejouer</button><button class="ghost" id="endMap" type="button">Carte</button><button class="ghost" id="endHub" type="button">QG</button></div>
+</section>
+
+<section id="story" class="panel story" hidden role="dialog" aria-modal="true" aria-labelledby="stTitle">
+  <span class="eyebrow" id="stEyebrow"></span>
+  <h2 id="stTitle"></h2>
+  <p id="stText"></p>
+  <div class="row"><button class="cta" id="stClose" type="button">Continuer</button></div>
+</section>
