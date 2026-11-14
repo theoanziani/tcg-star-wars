@@ -181,7 +181,7 @@ function renderBoosterUI() {
   const hint = $('#bHint');
   if (ph === 'idle') hint.innerHTML = n ? 'Glisse ton doigt sur le paquet pour le déchirer <span class="swipe" aria-hidden="true"></span>' : 'Aucun booster : achète-en un ou gagne des missions de chef (5, 10, 15 et 20).';
   else if (ph === 'reveal') hint.textContent = `Touche la carte pour la retourner · ${bo.idx} / ${bo.cards.length}`;
-  else if (ph === 'summary') { const nn = bo.cards.filter(c => c.isNew).length, ups = bo.cards.filter(c => c.up).length; hint.textContent = `${nn ? `${nn} nouvelle${nn > 1 ? 's' : ''} carte${nn > 1 ? 's' : ''}` : 'Aucune nouvelle carte'}${ups ? ` · ${ups} niveau${ups > 1 ? 'x' : ''} gagné${ups > 1 ? 's' : ''}` : ''}.`; }
+  else if (ph === 'summary') { const nn = bo.cards.filter(c => c.isNew).length, ups = bo.cards.filter(c => c.up).length; hint.textContent = `${nn ? `${nn} nouvelle${nn > 1 ? 's' : ''} carte${nn > 1 ? 's' : ''}` : 'Aucune nouvelle carte'}${ups ? ` · ${ups} niveau${ups > 1 ? 'x' : ''} gagné${ups > 1 ? 's' : ''}` : ''}. Touche une carte pour voir sa fiche.`; }
   else hint.textContent = '';
 }
 function setTear(p) {
@@ -204,7 +204,14 @@ function boosterPointer(type, e) {
     }
     if (type === 'up' && bo.dragX != null) { bo.dragX = null; const p0 = bo.p; tween(0.25, k => setTear(p0 * (1 - k))); }
   } else if (bo.phase === 'reveal' && type === 'up') revealNext();
+  else if (bo.phase === 'summary' && type === 'up') {
+    /* récapitulatif : toucher une carte ouvre sa fiche */
+    bRay.setFromCamera(new THREE.Vector2(bo.ptr.x, bo.ptr.y), bCam);
+    const hit = bRay.intersectObjects(bo.summary, true)[0];
+    if (hit) { let g = hit.object; while (g && !bo.summary.includes(g)) g = g.parent; if (g) { sfx.click(); openCard(g.userData.card.id); } }
+  }
 }
+const bRay = new THREE.Raycaster();
 function autoTear() {
   if (bo.phase !== 'idle' || !save.boosters) return;
   bo.phase = 'tearing'; renderBoosterUI();
