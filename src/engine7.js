@@ -21,7 +21,8 @@ canvas.addEventListener('pointercancel', e => { if (SPECIAL[screen]) return SPEC
 function updateCamera(dt, t) {
   const hub = screen !== 'battle' && screen !== 'prep', wide = W > 720;
   const yaw = cam.yaw + (hub && !reduceMotion && !drag ? Math.sin(t * 0.12) * 0.3 : 0);
-  const dist = hub ? cam.dist * 0.6 : cam.dist, height = hub ? cam.height * 0.48 : cam.height;
+  const big = !hub && mission && mission.deckKey === 'board16' ? 1.14 : 1; /* plateau plein : un peu plus de recul */
+  const dist = hub ? cam.dist * 0.6 : cam.dist * big, height = hub ? cam.height * 0.48 : cam.height * big;
   const drift = reduceMotion ? 0 : Math.sin(t * 0.25) * 0.12;
   const look = hub ? new V3(wide ? -1.6 : 0, 0.5, PLAYER_Z + (wide ? 0 : 0.6)) : new V3(screen === 'prep' && wide ? -2.4 : 0, cam.lookY, cam.lookZ);
   const pos = new V3(Math.sin(yaw) * dist + drift, height, Math.cos(yaw) * dist + (hub ? PLAYER_Z * 0.6 : 0));

@@ -16,13 +16,13 @@ function go(name) {
   if (name === 'prep') renderPrep();
 }
 const ownedOf = ids => ids.filter(id => count(id)).length;
-function deckSide() {
-  const sides = new Set(boardUnits(save.deck.board).map(id => CARDS[id].side));
+function deckSide(key = 'board') {
+  const sides = new Set(boardUnits(save.deck[key]).map(id => CARDS[id].side));
   return sides.has('light') && sides.has('dark') ? 'mixed' : sides.has('dark') ? 'dark' : sides.has('light') ? 'light' : 'neutral';
 }
-function deckProblem() {
-  const s = deckSide();
-  if (!boardUnits(save.deck.board).length) return 'Ajoute au moins un personnage sur le plateau.';
+function deckProblem(key = 'board') {
+  const s = deckSide(key);
+  if (!boardUnits(save.deck[key]).length) return 'Ajoute au moins un personnage sur le plateau.';
   if (s === 'mixed') return 'Un deck ne peut pas mélanger le côté lumineux et le côté obscur.';
   return '';
 }
@@ -41,18 +41,21 @@ function refreshHub() {
   $('#mColl').textContent = `${ownedOf(UNIT_IDS)} / ${UNIT_IDS.length} personnages`;
   const p = deckProblem();
   $('#mDeck').textContent = p ? 'Deck à corriger' : `${sideLabel(s)} · ${boardUnits(save.deck.board).length} personnages`;
-  $('#mSurv').textContent = save.best ? `Record : ${save.best} vague${save.best > 1 ? 's' : ''}` : 'Des vagues sans fin : tiens le plus longtemps possible';
+  const rec = n => (n ? `Record : ${n} vague${n > 1 ? 's' : ''}` : 'Pas encore de record');
+  $('#mSurv').textContent = `Jusqu'à 8 personnages · ${rec(save.best)}`;
+  $('#mSurv16').textContent = `Jusqu'à 16 personnages · ${rec(save.best16)}`;
   const note = $('#refundNote'); note.hidden = !save.refunded;
   if (save.refunded) note.textContent = `Les cartes Capacités ont disparu : chaque personnage a maintenant les siennes. Tes anciennes capacités t'ont rapporté ${save.refunded} crédits.`;
 }
 function showHub() { refreshHub(); showHubScene(); }
 $$('[data-go]').forEach(b => b.addEventListener('click', () => { sfx.click(); go(b.dataset.go); }));
-$('#mSurvBtn').addEventListener('click', () => { sfx.click(); startPrep(survivalMission()); });
+$('#mSurvBtn').addEventListener('click', () => { sfx.click(); startPrep(survivalMission('board')); });
+$('#mSurv16Btn').addEventListener('click', () => { sfx.click(); startPrep(survivalMission('board16')); });
 addEventListener('pointerdown', () => sfx.init());
 addEventListener('keydown', () => sfx.init());
 
 /* --- Albums --- */
-const inDeck = id => save.deck.board.filter(x => x === id).length;
+const inDeck = (id, key = view.deck) => save.deck[key].filter(x => x === id).length;
 function tile(id, onClick) {
   const d = CARDS[id], b = document.createElement('button'), rar = DATA.rarities[d.rarity];
   b.type = 'button'; b.style.setProperty('--r', rar.color);
@@ -64,7 +67,7 @@ function tile(id, onClick) {
   return b;
 }
 const UNIT_FACTIONS = Object.keys(ROSTER);
-const view = { filter: 'all', poolFilter: 'all' };
+const view = { filter: 'all', poolFilter: 'all', deck: 'board' };
 function chipsFor(container, current, onPick) {
   const groups = UNIT_FACTIONS, ids = UNIT_IDS;
   container.innerHTML = '';
@@ -113,16 +116,16 @@ $('#cmRemove').addEventListener('click', () => { removeFromDeck(modalId); $('#ca
 const ROW_NAMES = ['Ligne avant', 'Ligne 2', 'Ligne 3', 'Arrière'];
 const pick4 = { deck: null, prep: null };
 function addToDeck(id) {
-  const d = CARDS[id], board = save.deck.board;
+  const d = CARDS[id], board = save.deck[view.deck], cap = DECKS[view.deck].cap;
   if (isUnique(id) && inDeck(id)) return flashWarn(`${CARDS[id].name} est un personnage unique : il est déjà dans ton deck.`);
-  if (boardUnits(board).length >= DATA.rules.deckUnits) return flashWarn(`Ton plateau a déjà ${DATA.rules.deckUnits} personnages : retires-en un d'abord.`);
-  const s = deckSide(); if ((s === 'light' && d.side === 'dark') || (s === 'dark' && d.side === 'light')) return flashWarn(`Ton deck est du ${DATA.sides[s].toLowerCase()} : ce personnage n'y a pas sa place.`);
+  if (boardUnits(board).length >= cap) return flashWarn(`Ce plateau a déjà ${cap} personnages : retires-en un d'abord.`);
+  const s = deckSide(view.deck); if ((s === 'light' && d.side === 'dark') || (s === 'dark' && d.side === 'light')) return flashWarn(`Ton deck est du ${DATA.sides[s].toLowerCase()} : ce personnage n'y a pas sa place.`);
   const want = ROLE_ROW[d.role], cell = [want, ...[0, 1, 2, 3].filter(r => r !== want)].flatMap(cellOrder).find(i => !board[i]);
   board[cell] = id;
   persist(); sfx.click(); return '';
 }
 function removeFromDeck(id, index) {
-  const i = index ?? save.deck.board.lastIndexOf(id); if (i >= 0) save.deck.board[i] = null;
+  const b = save.deck[view.deck], i = index ?? b.lastIndexOf(id); if (i >= 0) b[i] = null;
   persist(); sfx.click();
 }
 function flashWarn(msg) { const w = $(screen === 'deck' ? '#dWarn' : '#cmMsg'); w.hidden = false; w.textContent = msg; sfx.deny(); return msg; }
@@ -149,25 +152,32 @@ function renderBoard(el, board, key, onChange) {
 }
 function renderDeck() {
   const pool = $('#dPool'); pool.innerHTML = '';
-  renderBoard($('#dBoard'), save.deck.board, 'deck', () => persist());
-  $('#dUnitsN').textContent = `${boardUnits(save.deck.board).length} / ${DATA.rules.deckUnits}`;
-  const sel = pick4.deck; $('#dRemove').hidden = sel == null || !save.deck.board[sel];
-  const s = deckSide(), chip = $('#dSide'); chip.className = `sidechip ${s}`; chip.textContent = sideLabel(s);
-  const p = deckProblem(), w = $('#dWarn'); w.hidden = !p; w.textContent = p;
+  const key = view.deck, board = save.deck[key];
+  $$('[data-deck]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.deck === key)));
+  $('#dWhat').textContent = key === 'board' ? 'Composition de base (campagne et survie)' : 'Composition de la survie étendue';
+  renderBoard($('#dBoard'), board, 'deck', () => persist());
+  $('#dUnitsN').textContent = `${boardUnits(board).length} / ${DECKS[key].cap}`;
+  const sel = pick4.deck; $('#dRemove').hidden = sel == null || !board[sel];
+  $('#dCopy').hidden = key === 'board';
+  const s = deckSide(key), chip = $('#dSide'); chip.className = `sidechip ${s}`; chip.textContent = sideLabel(s);
+  const p = deckProblem(key), w = $('#dWarn'); w.hidden = !p; w.textContent = p;
   chipsFor($('#poolChips'), view.poolFilter, k => { view.poolFilter = k; renderDeck(); });
   const ids = UNIT_IDS.filter(id => count(id) && (view.poolFilter === 'all' || CARDS[id].faction === view.poolFilter));
   ids.forEach(id => { const t = tile(id, () => { const m = addToDeck(id); renderDeck(); if (m) { const w = $('#dWarn'); w.hidden = false; w.textContent = m; } }); if (!(isUnique(id) && inDeck(id))) t.classList.remove('indeck'); pool.append(t); });
   if (!ids.length) { const e = document.createElement('p'); e.className = 'warn'; e.textContent = 'Aucune carte disponible ici. Ouvre des boosters pour en obtenir.'; pool.append(e); }
 }
 $('#dBoard').addEventListener('boardchange', () => renderDeck());
-$('#dRemove').addEventListener('click', () => { const i = pick4.deck; if (i == null) return; removeFromDeck(save.deck.board[i], i); pick4.deck = null; renderDeck(); });
-$('#dAuto').addEventListener('click', () => { save.deck.board = autoFormation(boardUnits(save.deck.board)); pick4.deck = null; persist(); sfx.click(); renderDeck(); });
+$('#dRemove').addEventListener('click', () => { const i = pick4.deck; if (i == null) return; removeFromDeck(save.deck[view.deck][i], i); pick4.deck = null; renderDeck(); });
+$('#dAuto').addEventListener('click', () => { save.deck[view.deck] = autoFormation(boardUnits(save.deck[view.deck])); pick4.deck = null; persist(); sfx.click(); renderDeck(); });
+$$('[data-deck]').forEach(b => b.addEventListener('click', () => { view.deck = b.dataset.deck; pick4.deck = null; sfx.click(); renderDeck(); }));
+$('#dCopy').addEventListener('click', () => { save.deck.board16 = [...save.deck.board]; pick4.deck = null; persist(); sfx.click(); renderDeck(); });
 
 /* --- Préparation avant combat --- */
 function renderPrep() {
   const W2 = mission.live, back = $('#prep .back');
   back.dataset.go = mission.survival ? 'hub' : 'missions'; back.textContent = mission.survival ? 'Retour au QG' : 'Retour à la carte';
-  $('#pTitle').textContent = mission.survival ? `Survie · record : ${save.best} vague${save.best > 1 ? 's' : ''}` : `${DATA.campaign[mission.pi].name} ${mission.i} · ${mTitle(mission)}`;
+  const bk = mission.survival && DECKS[mission.deckKey].best;
+  $('#pTitle').textContent = mission.survival ? `${mTitle(mission)} · record : ${save[bk]} vague${save[bk] > 1 ? 's' : ''}` : `${DATA.campaign[mission.pi].name} ${mission.i} · ${mTitle(mission)}`;
   $('#pBrief').textContent = mission.text[side];
   const names = W2[0].map(r => CARDS[r.replace('!', '')].name), cnt = {};
   names.forEach(n => (cnt[n] = (cnt[n] || 0) + 1));
@@ -176,13 +186,15 @@ function renderPrep() {
     ? `Vagues sans fin, de plus en plus fortes, avec un chef toutes les 5 vagues. Entre deux vagues, tes survivants récupèrent ${pct(DATA.rules.survival.heal)} de leurs PV ; les personnages tombés ne reviennent pas. ${first}`
     : `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.foeLvl}, autant que tes personnages. ${first}${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
   renderBoard($('#pBoard'), prepBoard, 'prep', b => rearrange(b));
-  $('#pSave').disabled = prepBoard.every((id, i) => id === save.deck.board[i]);
+  $('#pSave').disabled = prepSaved();
 }
-$('#pBoard').addEventListener('boardchange', () => { $('#pSave').disabled = prepBoard.every((id, i) => id === save.deck.board[i]); });
+const prepKey = () => mission.deckKey || 'board';
+const prepSaved = () => prepBoard.every((id, i) => id === save.deck[prepKey()][i]);
+$('#pBoard').addEventListener('boardchange', () => { $('#pSave').disabled = prepSaved(); });
 $('#pFight').addEventListener('click', () => { sfx.click(); pick4.prep = null; beginFight(); });
-$('#pReset').addEventListener('click', () => { sfx.click(); pick4.prep = null; rearrange([...save.deck.board]); renderPrep(); });
+$('#pReset').addEventListener('click', () => { sfx.click(); pick4.prep = null; rearrange([...save.deck[prepKey()]]); renderPrep(); });
 $('#pAuto').addEventListener('click', () => { sfx.click(); pick4.prep = null; rearrange(autoFormation(boardUnits(prepBoard))); renderPrep(); });
-$('#pSave').addEventListener('click', () => { save.deck.board = [...prepBoard]; persist(); sfx.power(); renderPrep(); });
+$('#pSave').addEventListener('click', () => { save.deck[prepKey()] = [...prepBoard]; persist(); sfx.power(); renderPrep(); });
 
 /* --- Combat : boutons --- */
 $('#quitBtn').addEventListener('click', () => { sfx.click(); go('hub'); });

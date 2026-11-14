@@ -23,6 +23,7 @@
     <nav class="menu" aria-label="Menu du QG">
       <button class="mbtn primary" type="button" data-go="missions"><b>Campagne</b><span id="mMissions"></span></button>
       <button class="mbtn" type="button" id="mSurvBtn"><b>Survie</b><span id="mSurv"></span></button>
+      <button class="mbtn" type="button" id="mSurv16Btn"><b>Survie étendue</b><span id="mSurv16"></span></button>
       <button class="mbtn" type="button" data-go="booster" id="mBoosterBtn"><b>Boosters</b><span id="mBooster"></span></button>
       <button class="mbtn" type="button" data-go="collection"><b>Collection</b><span id="mColl"></span></button>
       <button class="mbtn" type="button" data-go="deck"><b>Deck</b><span id="mDeck"></span></button>
@@ -84,10 +85,11 @@
 <section id="deck" class="screen safe" hidden aria-labelledby="dTitle">
   <div class="sbar"><button class="back" type="button" data-go="hub">Retour au QG</button><h2 id="dTitle">Deck</h2><span class="sidechip" id="dSide"></span></div>
   <div class="sbody">
-    <div class="section-title">Composition de base · <span id="dUnitsN"></span> personnages · la ligne avant fait face à l'ennemi</div>
+    <div class="tabs" role="group" aria-label="Choisir la composition"><button class="tab" type="button" data-deck="board" aria-pressed="true">Base · 8</button><button class="tab" type="button" data-deck="board16" aria-pressed="false">Survie étendue · 16</button></div>
+    <div class="section-title"><span id="dWhat"></span> · <span id="dUnitsN"></span> personnages · la ligne avant fait face à l'ennemi</div>
     <div class="boardwrap">
       <div class="board" id="dBoard"></div>
-      <div class="boardside"><p class="hint">Touche une carte puis une case pour la déplacer ou l'échanger. La ligne avant encaisse la plupart des tirs : place-y tes protecteurs et tes utilisateurs de la Force.</p><div class="row"><button class="ghost" id="dAuto" type="button">Placement automatique</button><button class="ghost" id="dRemove" type="button" hidden>Retirer la carte</button></div></div>
+      <div class="boardside"><p class="hint">Touche une carte puis une case pour la déplacer ou l'échanger. La ligne avant encaisse la plupart des tirs : place-y tes protecteurs et tes utilisateurs de la Force.</p><div class="row"><button class="ghost" id="dAuto" type="button">Placement automatique</button><button class="ghost" id="dCopy" type="button">Repartir de la base</button><button class="ghost" id="dRemove" type="button" hidden>Retirer la carte</button></div></div>
     </div>
     <p class="warn" id="dWarn" hidden></p>
     <div class="section-title">Ta collection · touche une carte pour l'ajouter (les personnages nommés sont uniques)</div>

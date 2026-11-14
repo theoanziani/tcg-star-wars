@@ -66,6 +66,7 @@ const auraOf = s => Math.min(0.5, team(s).reduce((acc, u) => acc + (u.def.aura |
 const dmgOut = u => (1 + auraOf(u.side) + (buffs[u.side].rage > 0 ? buffs[u.side].rageBonus : 0) + (u.st.rage > 0 ? 0.6 : 0)) * (1 + (u.def.dmgBonus || 0));
 const domes = [];
 const mTitle = m => m.title[side];
+const squadCap = () => DECKS[(mission && mission.deckKey) || 'board'].cap;
 
 function clearScene() {
   units().forEach(u => u.dispose());
@@ -114,10 +115,11 @@ function showHubScene() {
 }
 /* Préparation : la composition de base s'affiche, on peut l'ajuster avant l'affrontement */
 function startPrep(m) {
-  if (deckProblem()) { go('deck'); return; }
-  mission = m; side = deckSide() === 'dark' ? 'dark' : 'light';
+  const key = m.deckKey || 'board';
+  if (deckProblem(key)) { view.deck = key; go('deck'); return; }
+  mission = m; side = deckSide(key) === 'dark' ? 'dark' : 'light';
   clearScene(); applyPlanet(m.planet); state = 'prep'; waveIdx = 0;
-  prepBoard = [...save.deck.board];
+  prepBoard = [...save.deck[key]];
   if (m.survival) { m.boost = 1; m.live = [survivalWave(m, side, prepBoard, 1)]; }
   else { m.live = fitWaves(m, side, prepBoard); m.foeLvl = foeLvlFor(m, prepBoard); }
   spawnAllies(prepBoard); foes = spawnFoes(m.live[0]);
@@ -186,11 +188,11 @@ function lose() {
   later(1.3, () => showEnd(false, [`+${gain} crédits`], 0));
 }
 function endSurvival() {
-  const R = DATA.rules.survival, done = waveIdx, record = done > save.best;
+  const R = DATA.rules.survival, done = waveIdx, bk = DECKS[mission.deckKey].best, record = done > save[bk];
   const credits = done * R.credits, boosters = Math.floor(done / R.boosterEvery);
-  save.credits += credits; save.boosters += boosters; if (record) save.best = done; persist();
+  save.credits += credits; save.boosters += boosters; if (record) save[bk] = done; persist();
   later(1.3, () => {
-    $('#endEyebrow').textContent = `Survie · record : ${save.best} vague${save.best > 1 ? 's' : ''}`;
+    $('#endEyebrow').textContent = `${mTitle(mission)} · record : ${save[bk]} vague${save[bk] > 1 ? 's' : ''}`;
     $('#endTitle').textContent = record && done ? 'Nouveau record !' : 'Fin de la survie';
     $('#endStars').hidden = true;
     $('#endText').textContent = `Ton escouade a repoussé ${done} vague${done > 1 ? 's' : ''}. Chaque vague rapporte ${R.credits} crédits, et un booster toutes les ${R.boosterEvery} vagues.`;
@@ -387,7 +389,7 @@ function castSkill(u, k, ctx) {
 const ULT_NEED = {
   revive: u => (deadOf(u.side).length ? '' : 'Personne à relever'),
   healAll: u => (team(u.side).some(a => a.hp < a.maxHp) ? '' : 'Personne de blessé'),
-  summon: u => (freeCell(u.side) != null && team(u.side).length < DATA.rules.deckUnits ? '' : 'Plateau complet'),
+  summon: u => (freeCell(u.side) != null && team(u.side).length < squadCap() ? '' : 'Plateau complet'),
   throw: u => (u.thrown || u.busy ? 'Occupé' : ''),
   shieldTeam: () => '', barrier: () => '', rage: () => '', haste: () => '', fortress: () => '',
 };
@@ -556,7 +558,7 @@ const FX = {
     later(0.4, () => { const r = respawn(u.side, dead.cell, dead.id, k.pct / 100, dead.lvl); pop(r.head(), 'Relevé', 'buff'); });
   },
   summon(u, k) {
-    const cell = freeCell(u.side); if (cell == null || team(u.side).length >= DATA.rules.deckUnits) return false;
+    const cell = freeCell(u.side); if (cell == null || team(u.side).length >= squadCap()) return false;
     const id = SUMMON[u.def.side]; respawn(u.side, cell, id, 1, u.side === 'player' ? levelOf(id) || 1 : mission.foeLvl);
   },
   /* sur soi */
@@ -579,7 +581,7 @@ const ultEl = $('#ults');
 let ultUnits = [];
 function renderUlts() {
   ultEl.innerHTML = '';
-  ultUnits = allies.filter(a => a && a.ult);
+  ultUnits = allies.filter(a => a && a.ult); ultEl.classList.toggle('many', ultUnits.length > 8);
   $('#ultHint').textContent = ultUnits.length
     ? 'Touche un personnage chargé (ou son bouton) pour lancer son ultime.'
     : `Aucun ultime dans ton escouade : ils se débloquent au niveau ${DATA.rules.unlock[2]} des cartes. Tes personnages se battent seuls avec leurs capacités.`;
@@ -602,7 +604,7 @@ function tapUnit(x, y) {
 }
 function updateWaveLabel() {
   if (!mission) return;
-  $('#waveLabel').textContent = `${mission.survival ? 'Survie' : `${DATA.campaign[mission.pi].name} ${mission.i}`} · ${waveTxt()}`;
+  $('#waveLabel').textContent = `${mission.survival ? mTitle(mission) : `${DATA.campaign[mission.pi].name} ${mission.i}`} · ${waveTxt()}`;
   const left = foes.filter(f => f.alive).length;
   $('#foesLabel').textContent = left ? `${left} ennemi${left > 1 ? 's' : ''} sur le plateau` : 'Vague repoussée';
 }

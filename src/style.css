@@ -232,6 +232,10 @@ button:focus-visible{outline:2px solid var(--ordre);outline-offset:2px}
 .ultb.ready{opacity:1;border-color:color-mix(in srgb,var(--c) 70%,transparent);box-shadow:0 0 22px -6px var(--c);animation:ultpulse 1.4s ease-in-out infinite}
 .ultb.ready:hover{transform:translateY(-3px)}
 .ultb.dead{opacity:.3;filter:grayscale(1)}
+.ults.many .ultb{width:auto;grid-template-columns:28px;padding:5px}
+.ults.many .ultb .uimg{width:28px}
+.ults.many .ultb .uname,.ults.many .ultb .uwho,.ults.many .ultb svg{display:none}
+.ults.many .ultb .ureq{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:9px;text-shadow:0 1px 2px #000}
 @keyframes ultpulse{50%{box-shadow:0 0 30px -2px var(--c)}}
 .ubar{width:54px;height:3px;border-radius:2px;background:rgba(0,0,0,.6);overflow:hidden}
 .ubar i{display:block;height:100%;background:var(--gold);transform-origin:left;transform:scaleX(0)}

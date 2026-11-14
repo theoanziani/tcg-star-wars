@@ -241,6 +241,10 @@ button:focus-visible{outline:2px solid var(--ordre);outline-offset:2px}
 .ultb.ready{opacity:1;border-color:color-mix(in srgb,var(--c) 70%,transparent);box-shadow:0 0 22px -6px var(--c);animation:ultpulse 1.4s ease-in-out infinite}
 .ultb.ready:hover{transform:translateY(-3px)}
 .ultb.dead{opacity:.3;filter:grayscale(1)}
+.ults.many .ultb{width:auto;grid-template-columns:28px;padding:5px}
+.ults.many .ultb .uimg{width:28px}
+.ults.many .ultb .uname,.ults.many .ultb .uwho,.ults.many .ultb svg{display:none}
+.ults.many .ultb .ureq{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:9px;text-shadow:0 1px 2px #000}
 @keyframes ultpulse{50%{box-shadow:0 0 30px -2px var(--c)}}
 .ubar{width:54px;height:3px;border-radius:2px;background:rgba(0,0,0,.6);overflow:hidden}
 .ubar i{display:block;height:100%;background:var(--gold);transform-origin:left;transform:scaleX(0)}
@@ -361,6 +365,7 @@ button:focus-visible{outline:2px solid var(--ordre);outline-offset:2px}
     <nav class="menu" aria-label="Menu du QG">
       <button class="mbtn primary" type="button" data-go="missions"><b>Campagne</b><span id="mMissions"></span></button>
       <button class="mbtn" type="button" id="mSurvBtn"><b>Survie</b><span id="mSurv"></span></button>
+      <button class="mbtn" type="button" id="mSurv16Btn"><b>Survie étendue</b><span id="mSurv16"></span></button>
       <button class="mbtn" type="button" data-go="booster" id="mBoosterBtn"><b>Boosters</b><span id="mBooster"></span></button>
       <button class="mbtn" type="button" data-go="collection"><b>Collection</b><span id="mColl"></span></button>
       <button class="mbtn" type="button" data-go="deck"><b>Deck</b><span id="mDeck"></span></button>
@@ -422,10 +427,11 @@ button:focus-visible{outline:2px solid var(--ordre);outline-offset:2px}
 <section id="deck" class="screen safe" hidden aria-labelledby="dTitle">
   <div class="sbar"><button class="back" type="button" data-go="hub">Retour au QG</button><h2 id="dTitle">Deck</h2><span class="sidechip" id="dSide"></span></div>
   <div class="sbody">
-    <div class="section-title">Composition de base · <span id="dUnitsN"></span> personnages · la ligne avant fait face à l'ennemi</div>
+    <div class="tabs" role="group" aria-label="Choisir la composition"><button class="tab" type="button" data-deck="board" aria-pressed="true">Base · 8</button><button class="tab" type="button" data-deck="board16" aria-pressed="false">Survie étendue · 16</button></div>
+    <div class="section-title"><span id="dWhat"></span> · <span id="dUnitsN"></span> personnages · la ligne avant fait face à l'ennemi</div>
     <div class="boardwrap">
       <div class="board" id="dBoard"></div>
-      <div class="boardside"><p class="hint">Touche une carte puis une case pour la déplacer ou l'échanger. La ligne avant encaisse la plupart des tirs : place-y tes protecteurs et tes utilisateurs de la Force.</p><div class="row"><button class="ghost" id="dAuto" type="button">Placement automatique</button><button class="ghost" id="dRemove" type="button" hidden>Retirer la carte</button></div></div>
+      <div class="boardside"><p class="hint">Touche une carte puis une case pour la déplacer ou l'échanger. La ligne avant encaisse la plupart des tirs : place-y tes protecteurs et tes utilisateurs de la Force.</p><div class="row"><button class="ghost" id="dAuto" type="button">Placement automatique</button><button class="ghost" id="dCopy" type="button">Repartir de la base</button><button class="ghost" id="dRemove" type="button" hidden>Retirer la carte</button></div></div>
     </div>
     <p class="warn" id="dWarn" hidden></p>
     <div class="section-title">Ta collection · touche une carte pour l'ajouter (les personnages nommés sont uniques)</div>
@@ -1150,9 +1156,11 @@ function fitWaves(m, sd, board) {
 /* ================================================================
    SURVIE : les vagues s'enchaînent jusqu'à la chute de l'escouade
    ================================================================ */
-function survivalMission() {
-  const planets = DATA.campaign.map(P => P.id);
-  return { id: 'survie', survival: true, planet: pick(planets), pi: -1, i: 0, title: { light: 'Survie', dark: 'Survie' },
+/* deux compositions : la base (8 personnages) et la survie étendue (16, tout le plateau) */
+const DECKS = { board: { cap: 8, best: 'best', label: 'Survie' }, board16: { cap: CELLS, best: 'best16', label: 'Survie étendue' } };
+function survivalMission(key = 'board') {
+  const planets = DATA.campaign.map(P => P.id), L = DECKS[key].label;
+  return { id: `survie-${key}`, survival: true, deckKey: key, planet: pick(planets), pi: -1, i: 0, title: { light: L, dark: L },
     text: { light: 'Les vagues ne s\'arrêtent jamais. Tiens le plus longtemps possible.', dark: 'Les vagues ne s\'arrêtent jamais. Tiens le plus longtemps possible.' }, lvl: 1, reward: 0, live: [] };
 }
 /* Vague k : autant d'ennemis que tes personnages (+1 toutes les 5 vagues), raretés et niveau qui montent,
@@ -1161,7 +1169,7 @@ function survivalWave(m, sd, board, k) {
   const foeSide = id => CARDS[id].side !== sd, rank = id => RANKS.indexOf(CARDS[id].rarity);
   const top = Math.min(4, Math.floor((k - 1) / 4));
   const pool = UNIT_IDS.filter(id => foeSide(id) && !isUnique(id) && rank(id) <= top);
-  const n = Math.min(DATA.rules.deckUnits, boardUnits(board).length + Math.floor(k / 5));
+  const n = Math.min(DECKS[m.deckKey].cap, boardUnits(board).length + Math.floor(k / 5));
   const list = Array.from({ length: n }, () => pick(pool));
   if (k % 5 === 0) { const chefs = UNIT_IDS.filter(id => foeSide(id) && isUnique(id) && rank(id) <= Math.min(4, k / 5)); list[0] = `${pick(chefs)}!`; }
   m.foeLvl = clamp(teamLvl(board) + Math.floor((k - 1) / 5), 1, DATA.rules.maxLevel);
@@ -1202,7 +1210,7 @@ function roundRect(g, x, y, w, h, r) {
    SAUVEGARDE : compte claude.ai si disponible, sinon cet appareil
    ================================================================ */
 const KEY = 'tcg-star-wars-save-v1';
-const fresh = () => ({ v: 4, updatedAt: 0, credits: DATA.starter.credits, boosters: DATA.starter.boosters, owned: { ...DATA.starter.owned }, deck: { board: autoFormation(DATA.starter.deck) }, won: {}, seen: {}, best: 0 });
+const fresh = () => ({ v: 4, updatedAt: 0, credits: DATA.starter.credits, boosters: DATA.starter.boosters, owned: { ...DATA.starter.owned }, deck: { board: autoFormation(DATA.starter.deck), board16: autoFormation(DATA.starter.deck) }, won: {}, seen: {}, best: 0, best16: 0 });
 function normalize(s) {
   const base = fresh();
   if (!s || typeof s !== 'object') return base;
@@ -1215,15 +1223,17 @@ function normalize(s) {
   const deck = s.deck || base.deck;
   const okUnit = id => fix(id);
   let board = Array.isArray(deck.board) && deck.board.length === CELLS ? deck.board.map(okUnit) : autoFormation((deck.units || []).map(okUnit));
-  let placed = 0; board = board.map(id => (id && placed < DATA.rules.deckUnits ? (placed++, id) : null));
+  const limit = (b, n) => { let placed = 0; return b.map(id => (id && placed < n ? (placed++, id) : null)); };
+  board = limit(board, DATA.rules.deckUnits);
+  const board16 = limit(Array.isArray(deck.board16) && deck.board16.length === CELLS ? deck.board16.map(okUnit) : [...board], CELLS);
   const won = {}; Object.entries(s.won || {}).forEach(([k, v]) => { if (MISSIONS_BY_ID[k]) won[k] = clamp(Number(v) || 1, 1, 3); });
   return {
     v: 4, updatedAt: Number(s.updatedAt) || 0,
     credits: Math.max(0, Number(s.credits) || 0) + refund,
     boosters: nb,
     owned: Object.keys(owned).length ? owned : base.owned,
-    deck: { board },
-    won, seen: { ...(s.seen || {}) }, best: Math.max(0, Math.floor(Number(s.best) || 0)),
+    deck: { board, board16 },
+    won, seen: { ...(s.seen || {}) }, best: Math.max(0, Math.floor(Number(s.best) || 0)), best16: Math.max(0, Math.floor(Number(s.best16) || 0)),
     refunded: refund || 0,
   };
 }
@@ -2048,6 +2058,7 @@ const auraOf = s => Math.min(0.5, team(s).reduce((acc, u) => acc + (u.def.aura |
 const dmgOut = u => (1 + auraOf(u.side) + (buffs[u.side].rage > 0 ? buffs[u.side].rageBonus : 0) + (u.st.rage > 0 ? 0.6 : 0)) * (1 + (u.def.dmgBonus || 0));
 const domes = [];
 const mTitle = m => m.title[side];
+const squadCap = () => DECKS[(mission && mission.deckKey) || 'board'].cap;
 
 function clearScene() {
   units().forEach(u => u.dispose());
@@ -2096,10 +2107,11 @@ function showHubScene() {
 }
 /* Préparation : la composition de base s'affiche, on peut l'ajuster avant l'affrontement */
 function startPrep(m) {
-  if (deckProblem()) { go('deck'); return; }
-  mission = m; side = deckSide() === 'dark' ? 'dark' : 'light';
+  const key = m.deckKey || 'board';
+  if (deckProblem(key)) { view.deck = key; go('deck'); return; }
+  mission = m; side = deckSide(key) === 'dark' ? 'dark' : 'light';
   clearScene(); applyPlanet(m.planet); state = 'prep'; waveIdx = 0;
-  prepBoard = [...save.deck.board];
+  prepBoard = [...save.deck[key]];
   if (m.survival) { m.boost = 1; m.live = [survivalWave(m, side, prepBoard, 1)]; }
   else { m.live = fitWaves(m, side, prepBoard); m.foeLvl = foeLvlFor(m, prepBoard); }
   spawnAllies(prepBoard); foes = spawnFoes(m.live[0]);
@@ -2168,11 +2180,11 @@ function lose() {
   later(1.3, () => showEnd(false, [`+${gain} crédits`], 0));
 }
 function endSurvival() {
-  const R = DATA.rules.survival, done = waveIdx, record = done > save.best;
+  const R = DATA.rules.survival, done = waveIdx, bk = DECKS[mission.deckKey].best, record = done > save[bk];
   const credits = done * R.credits, boosters = Math.floor(done / R.boosterEvery);
-  save.credits += credits; save.boosters += boosters; if (record) save.best = done; persist();
+  save.credits += credits; save.boosters += boosters; if (record) save[bk] = done; persist();
   later(1.3, () => {
-    $('#endEyebrow').textContent = `Survie · record : ${save.best} vague${save.best > 1 ? 's' : ''}`;
+    $('#endEyebrow').textContent = `${mTitle(mission)} · record : ${save[bk]} vague${save[bk] > 1 ? 's' : ''}`;
     $('#endTitle').textContent = record && done ? 'Nouveau record !' : 'Fin de la survie';
     $('#endStars').hidden = true;
     $('#endText').textContent = `Ton escouade a repoussé ${done} vague${done > 1 ? 's' : ''}. Chaque vague rapporte ${R.credits} crédits, et un booster toutes les ${R.boosterEvery} vagues.`;
@@ -2369,7 +2381,7 @@ function castSkill(u, k, ctx) {
 const ULT_NEED = {
   revive: u => (deadOf(u.side).length ? '' : 'Personne à relever'),
   healAll: u => (team(u.side).some(a => a.hp < a.maxHp) ? '' : 'Personne de blessé'),
-  summon: u => (freeCell(u.side) != null && team(u.side).length < DATA.rules.deckUnits ? '' : 'Plateau complet'),
+  summon: u => (freeCell(u.side) != null && team(u.side).length < squadCap() ? '' : 'Plateau complet'),
   throw: u => (u.thrown || u.busy ? 'Occupé' : ''),
   shieldTeam: () => '', barrier: () => '', rage: () => '', haste: () => '', fortress: () => '',
 };
@@ -2538,7 +2550,7 @@ const FX = {
     later(0.4, () => { const r = respawn(u.side, dead.cell, dead.id, k.pct / 100, dead.lvl); pop(r.head(), 'Relevé', 'buff'); });
   },
   summon(u, k) {
-    const cell = freeCell(u.side); if (cell == null || team(u.side).length >= DATA.rules.deckUnits) return false;
+    const cell = freeCell(u.side); if (cell == null || team(u.side).length >= squadCap()) return false;
     const id = SUMMON[u.def.side]; respawn(u.side, cell, id, 1, u.side === 'player' ? levelOf(id) || 1 : mission.foeLvl);
   },
   /* sur soi */
@@ -2561,7 +2573,7 @@ const ultEl = $('#ults');
 let ultUnits = [];
 function renderUlts() {
   ultEl.innerHTML = '';
-  ultUnits = allies.filter(a => a && a.ult);
+  ultUnits = allies.filter(a => a && a.ult); ultEl.classList.toggle('many', ultUnits.length > 8);
   $('#ultHint').textContent = ultUnits.length
     ? 'Touche un personnage chargé (ou son bouton) pour lancer son ultime.'
     : `Aucun ultime dans ton escouade : ils se débloquent au niveau ${DATA.rules.unlock[2]} des cartes. Tes personnages se battent seuls avec leurs capacités.`;
@@ -2584,7 +2596,7 @@ function tapUnit(x, y) {
 }
 function updateWaveLabel() {
   if (!mission) return;
-  $('#waveLabel').textContent = `${mission.survival ? 'Survie' : `${DATA.campaign[mission.pi].name} ${mission.i}`} · ${waveTxt()}`;
+  $('#waveLabel').textContent = `${mission.survival ? mTitle(mission) : `${DATA.campaign[mission.pi].name} ${mission.i}`} · ${waveTxt()}`;
   const left = foes.filter(f => f.alive).length;
   $('#foesLabel').textContent = left ? `${left} ennemi${left > 1 ? 's' : ''} sur le plateau` : 'Vague repoussée';
 }
@@ -2638,13 +2650,13 @@ function go(name) {
   if (name === 'prep') renderPrep();
 }
 const ownedOf = ids => ids.filter(id => count(id)).length;
-function deckSide() {
-  const sides = new Set(boardUnits(save.deck.board).map(id => CARDS[id].side));
+function deckSide(key = 'board') {
+  const sides = new Set(boardUnits(save.deck[key]).map(id => CARDS[id].side));
   return sides.has('light') && sides.has('dark') ? 'mixed' : sides.has('dark') ? 'dark' : sides.has('light') ? 'light' : 'neutral';
 }
-function deckProblem() {
-  const s = deckSide();
-  if (!boardUnits(save.deck.board).length) return 'Ajoute au moins un personnage sur le plateau.';
+function deckProblem(key = 'board') {
+  const s = deckSide(key);
+  if (!boardUnits(save.deck[key]).length) return 'Ajoute au moins un personnage sur le plateau.';
   if (s === 'mixed') return 'Un deck ne peut pas mélanger le côté lumineux et le côté obscur.';
   return '';
 }
@@ -2663,18 +2675,21 @@ function refreshHub() {
   $('#mColl').textContent = `${ownedOf(UNIT_IDS)} / ${UNIT_IDS.length} personnages`;
   const p = deckProblem();
   $('#mDeck').textContent = p ? 'Deck à corriger' : `${sideLabel(s)} · ${boardUnits(save.deck.board).length} personnages`;
-  $('#mSurv').textContent = save.best ? `Record : ${save.best} vague${save.best > 1 ? 's' : ''}` : 'Des vagues sans fin : tiens le plus longtemps possible';
+  const rec = n => (n ? `Record : ${n} vague${n > 1 ? 's' : ''}` : 'Pas encore de record');
+  $('#mSurv').textContent = `Jusqu'à 8 personnages · ${rec(save.best)}`;
+  $('#mSurv16').textContent = `Jusqu'à 16 personnages · ${rec(save.best16)}`;
   const note = $('#refundNote'); note.hidden = !save.refunded;
   if (save.refunded) note.textContent = `Les cartes Capacités ont disparu : chaque personnage a maintenant les siennes. Tes anciennes capacités t'ont rapporté ${save.refunded} crédits.`;
 }
 function showHub() { refreshHub(); showHubScene(); }
 $$('[data-go]').forEach(b => b.addEventListener('click', () => { sfx.click(); go(b.dataset.go); }));
-$('#mSurvBtn').addEventListener('click', () => { sfx.click(); startPrep(survivalMission()); });
+$('#mSurvBtn').addEventListener('click', () => { sfx.click(); startPrep(survivalMission('board')); });
+$('#mSurv16Btn').addEventListener('click', () => { sfx.click(); startPrep(survivalMission('board16')); });
 addEventListener('pointerdown', () => sfx.init());
 addEventListener('keydown', () => sfx.init());
 
 /* --- Albums --- */
-const inDeck = id => save.deck.board.filter(x => x === id).length;
+const inDeck = (id, key = view.deck) => save.deck[key].filter(x => x === id).length;
 function tile(id, onClick) {
   const d = CARDS[id], b = document.createElement('button'), rar = DATA.rarities[d.rarity];
   b.type = 'button'; b.style.setProperty('--r', rar.color);
@@ -2686,7 +2701,7 @@ function tile(id, onClick) {
   return b;
 }
 const UNIT_FACTIONS = Object.keys(ROSTER);
-const view = { filter: 'all', poolFilter: 'all' };
+const view = { filter: 'all', poolFilter: 'all', deck: 'board' };
 function chipsFor(container, current, onPick) {
   const groups = UNIT_FACTIONS, ids = UNIT_IDS;
   container.innerHTML = '';
@@ -2735,16 +2750,16 @@ $('#cmRemove').addEventListener('click', () => { removeFromDeck(modalId); $('#ca
 const ROW_NAMES = ['Ligne avant', 'Ligne 2', 'Ligne 3', 'Arrière'];
 const pick4 = { deck: null, prep: null };
 function addToDeck(id) {
-  const d = CARDS[id], board = save.deck.board;
+  const d = CARDS[id], board = save.deck[view.deck], cap = DECKS[view.deck].cap;
   if (isUnique(id) && inDeck(id)) return flashWarn(`${CARDS[id].name} est un personnage unique : il est déjà dans ton deck.`);
-  if (boardUnits(board).length >= DATA.rules.deckUnits) return flashWarn(`Ton plateau a déjà ${DATA.rules.deckUnits} personnages : retires-en un d'abord.`);
-  const s = deckSide(); if ((s === 'light' && d.side === 'dark') || (s === 'dark' && d.side === 'light')) return flashWarn(`Ton deck est du ${DATA.sides[s].toLowerCase()} : ce personnage n'y a pas sa place.`);
+  if (boardUnits(board).length >= cap) return flashWarn(`Ce plateau a déjà ${cap} personnages : retires-en un d'abord.`);
+  const s = deckSide(view.deck); if ((s === 'light' && d.side === 'dark') || (s === 'dark' && d.side === 'light')) return flashWarn(`Ton deck est du ${DATA.sides[s].toLowerCase()} : ce personnage n'y a pas sa place.`);
   const want = ROLE_ROW[d.role], cell = [want, ...[0, 1, 2, 3].filter(r => r !== want)].flatMap(cellOrder).find(i => !board[i]);
   board[cell] = id;
   persist(); sfx.click(); return '';
 }
 function removeFromDeck(id, index) {
-  const i = index ?? save.deck.board.lastIndexOf(id); if (i >= 0) save.deck.board[i] = null;
+  const b = save.deck[view.deck], i = index ?? b.lastIndexOf(id); if (i >= 0) b[i] = null;
   persist(); sfx.click();
 }
 function flashWarn(msg) { const w = $(screen === 'deck' ? '#dWarn' : '#cmMsg'); w.hidden = false; w.textContent = msg; sfx.deny(); return msg; }
@@ -2771,25 +2786,32 @@ function renderBoard(el, board, key, onChange) {
 }
 function renderDeck() {
   const pool = $('#dPool'); pool.innerHTML = '';
-  renderBoard($('#dBoard'), save.deck.board, 'deck', () => persist());
-  $('#dUnitsN').textContent = `${boardUnits(save.deck.board).length} / ${DATA.rules.deckUnits}`;
-  const sel = pick4.deck; $('#dRemove').hidden = sel == null || !save.deck.board[sel];
-  const s = deckSide(), chip = $('#dSide'); chip.className = `sidechip ${s}`; chip.textContent = sideLabel(s);
-  const p = deckProblem(), w = $('#dWarn'); w.hidden = !p; w.textContent = p;
+  const key = view.deck, board = save.deck[key];
+  $$('[data-deck]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.deck === key)));
+  $('#dWhat').textContent = key === 'board' ? 'Composition de base (campagne et survie)' : 'Composition de la survie étendue';
+  renderBoard($('#dBoard'), board, 'deck', () => persist());
+  $('#dUnitsN').textContent = `${boardUnits(board).length} / ${DECKS[key].cap}`;
+  const sel = pick4.deck; $('#dRemove').hidden = sel == null || !board[sel];
+  $('#dCopy').hidden = key === 'board';
+  const s = deckSide(key), chip = $('#dSide'); chip.className = `sidechip ${s}`; chip.textContent = sideLabel(s);
+  const p = deckProblem(key), w = $('#dWarn'); w.hidden = !p; w.textContent = p;
   chipsFor($('#poolChips'), view.poolFilter, k => { view.poolFilter = k; renderDeck(); });
   const ids = UNIT_IDS.filter(id => count(id) && (view.poolFilter === 'all' || CARDS[id].faction === view.poolFilter));
   ids.forEach(id => { const t = tile(id, () => { const m = addToDeck(id); renderDeck(); if (m) { const w = $('#dWarn'); w.hidden = false; w.textContent = m; } }); if (!(isUnique(id) && inDeck(id))) t.classList.remove('indeck'); pool.append(t); });
   if (!ids.length) { const e = document.createElement('p'); e.className = 'warn'; e.textContent = 'Aucune carte disponible ici. Ouvre des boosters pour en obtenir.'; pool.append(e); }
 }
 $('#dBoard').addEventListener('boardchange', () => renderDeck());
-$('#dRemove').addEventListener('click', () => { const i = pick4.deck; if (i == null) return; removeFromDeck(save.deck.board[i], i); pick4.deck = null; renderDeck(); });
-$('#dAuto').addEventListener('click', () => { save.deck.board = autoFormation(boardUnits(save.deck.board)); pick4.deck = null; persist(); sfx.click(); renderDeck(); });
+$('#dRemove').addEventListener('click', () => { const i = pick4.deck; if (i == null) return; removeFromDeck(save.deck[view.deck][i], i); pick4.deck = null; renderDeck(); });
+$('#dAuto').addEventListener('click', () => { save.deck[view.deck] = autoFormation(boardUnits(save.deck[view.deck])); pick4.deck = null; persist(); sfx.click(); renderDeck(); });
+$$('[data-deck]').forEach(b => b.addEventListener('click', () => { view.deck = b.dataset.deck; pick4.deck = null; sfx.click(); renderDeck(); }));
+$('#dCopy').addEventListener('click', () => { save.deck.board16 = [...save.deck.board]; pick4.deck = null; persist(); sfx.click(); renderDeck(); });
 
 /* --- Préparation avant combat --- */
 function renderPrep() {
   const W2 = mission.live, back = $('#prep .back');
   back.dataset.go = mission.survival ? 'hub' : 'missions'; back.textContent = mission.survival ? 'Retour au QG' : 'Retour à la carte';
-  $('#pTitle').textContent = mission.survival ? `Survie · record : ${save.best} vague${save.best > 1 ? 's' : ''}` : `${DATA.campaign[mission.pi].name} ${mission.i} · ${mTitle(mission)}`;
+  const bk = mission.survival && DECKS[mission.deckKey].best;
+  $('#pTitle').textContent = mission.survival ? `${mTitle(mission)} · record : ${save[bk]} vague${save[bk] > 1 ? 's' : ''}` : `${DATA.campaign[mission.pi].name} ${mission.i} · ${mTitle(mission)}`;
   $('#pBrief').textContent = mission.text[side];
   const names = W2[0].map(r => CARDS[r.replace('!', '')].name), cnt = {};
   names.forEach(n => (cnt[n] = (cnt[n] || 0) + 1));
@@ -2798,13 +2820,15 @@ function renderPrep() {
     ? `Vagues sans fin, de plus en plus fortes, avec un chef toutes les 5 vagues. Entre deux vagues, tes survivants récupèrent ${pct(DATA.rules.survival.heal)} de leurs PV ; les personnages tombés ne reviennent pas. ${first}`
     : `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.foeLvl}, autant que tes personnages. ${first}${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
   renderBoard($('#pBoard'), prepBoard, 'prep', b => rearrange(b));
-  $('#pSave').disabled = prepBoard.every((id, i) => id === save.deck.board[i]);
+  $('#pSave').disabled = prepSaved();
 }
-$('#pBoard').addEventListener('boardchange', () => { $('#pSave').disabled = prepBoard.every((id, i) => id === save.deck.board[i]); });
+const prepKey = () => mission.deckKey || 'board';
+const prepSaved = () => prepBoard.every((id, i) => id === save.deck[prepKey()][i]);
+$('#pBoard').addEventListener('boardchange', () => { $('#pSave').disabled = prepSaved(); });
 $('#pFight').addEventListener('click', () => { sfx.click(); pick4.prep = null; beginFight(); });
-$('#pReset').addEventListener('click', () => { sfx.click(); pick4.prep = null; rearrange([...save.deck.board]); renderPrep(); });
+$('#pReset').addEventListener('click', () => { sfx.click(); pick4.prep = null; rearrange([...save.deck[prepKey()]]); renderPrep(); });
 $('#pAuto').addEventListener('click', () => { sfx.click(); pick4.prep = null; rearrange(autoFormation(boardUnits(prepBoard))); renderPrep(); });
-$('#pSave').addEventListener('click', () => { save.deck.board = [...prepBoard]; persist(); sfx.power(); renderPrep(); });
+$('#pSave').addEventListener('click', () => { save.deck[prepKey()] = [...prepBoard]; persist(); sfx.power(); renderPrep(); });
 
 /* --- Combat : boutons --- */
 $('#quitBtn').addEventListener('click', () => { sfx.click(); go('hub'); });
@@ -3357,7 +3381,8 @@ canvas.addEventListener('pointercancel', e => { if (SPECIAL[screen]) return SPEC
 function updateCamera(dt, t) {
   const hub = screen !== 'battle' && screen !== 'prep', wide = W > 720;
   const yaw = cam.yaw + (hub && !reduceMotion && !drag ? Math.sin(t * 0.12) * 0.3 : 0);
-  const dist = hub ? cam.dist * 0.6 : cam.dist, height = hub ? cam.height * 0.48 : cam.height;
+  const big = !hub && mission && mission.deckKey === 'board16' ? 1.14 : 1; /* plateau plein : un peu plus de recul */
+  const dist = hub ? cam.dist * 0.6 : cam.dist * big, height = hub ? cam.height * 0.48 : cam.height * big;
   const drift = reduceMotion ? 0 : Math.sin(t * 0.25) * 0.12;
   const look = hub ? new V3(wide ? -1.6 : 0, 0.5, PLAYER_Z + (wide ? 0 : 0.6)) : new V3(screen === 'prep' && wide ? -2.4 : 0, cam.lookY, cam.lookZ);
   const pos = new V3(Math.sin(yaw) * dist + drift, height, Math.cos(yaw) * dist + (hub ? PLAYER_Z * 0.6 : 0));

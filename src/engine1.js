@@ -195,9 +195,11 @@ function fitWaves(m, sd, board) {
 /* ================================================================
    SURVIE : les vagues s'enchaînent jusqu'à la chute de l'escouade
    ================================================================ */
-function survivalMission() {
-  const planets = DATA.campaign.map(P => P.id);
-  return { id: 'survie', survival: true, planet: pick(planets), pi: -1, i: 0, title: { light: 'Survie', dark: 'Survie' },
+/* deux compositions : la base (8 personnages) et la survie étendue (16, tout le plateau) */
+const DECKS = { board: { cap: 8, best: 'best', label: 'Survie' }, board16: { cap: CELLS, best: 'best16', label: 'Survie étendue' } };
+function survivalMission(key = 'board') {
+  const planets = DATA.campaign.map(P => P.id), L = DECKS[key].label;
+  return { id: `survie-${key}`, survival: true, deckKey: key, planet: pick(planets), pi: -1, i: 0, title: { light: L, dark: L },
     text: { light: 'Les vagues ne s\'arrêtent jamais. Tiens le plus longtemps possible.', dark: 'Les vagues ne s\'arrêtent jamais. Tiens le plus longtemps possible.' }, lvl: 1, reward: 0, live: [] };
 }
 /* Vague k : autant d'ennemis que tes personnages (+1 toutes les 5 vagues), raretés et niveau qui montent,
@@ -206,7 +208,7 @@ function survivalWave(m, sd, board, k) {
   const foeSide = id => CARDS[id].side !== sd, rank = id => RANKS.indexOf(CARDS[id].rarity);
   const top = Math.min(4, Math.floor((k - 1) / 4));
   const pool = UNIT_IDS.filter(id => foeSide(id) && !isUnique(id) && rank(id) <= top);
-  const n = Math.min(DATA.rules.deckUnits, boardUnits(board).length + Math.floor(k / 5));
+  const n = Math.min(DECKS[m.deckKey].cap, boardUnits(board).length + Math.floor(k / 5));
   const list = Array.from({ length: n }, () => pick(pool));
   if (k % 5 === 0) { const chefs = UNIT_IDS.filter(id => foeSide(id) && isUnique(id) && rank(id) <= Math.min(4, k / 5)); list[0] = `${pick(chefs)}!`; }
   m.foeLvl = clamp(teamLvl(board) + Math.floor((k - 1) / 5), 1, DATA.rules.maxLevel);
@@ -247,7 +249,7 @@ function roundRect(g, x, y, w, h, r) {
    SAUVEGARDE : compte claude.ai si disponible, sinon cet appareil
    ================================================================ */
 const KEY = 'tcg-star-wars-save-v1';
-const fresh = () => ({ v: 4, updatedAt: 0, credits: DATA.starter.credits, boosters: DATA.starter.boosters, owned: { ...DATA.starter.owned }, deck: { board: autoFormation(DATA.starter.deck) }, won: {}, seen: {}, best: 0 });
+const fresh = () => ({ v: 4, updatedAt: 0, credits: DATA.starter.credits, boosters: DATA.starter.boosters, owned: { ...DATA.starter.owned }, deck: { board: autoFormation(DATA.starter.deck), board16: autoFormation(DATA.starter.deck) }, won: {}, seen: {}, best: 0, best16: 0 });
 function normalize(s) {
   const base = fresh();
   if (!s || typeof s !== 'object') return base;
@@ -260,15 +262,17 @@ function normalize(s) {
   const deck = s.deck || base.deck;
   const okUnit = id => fix(id);
   let board = Array.isArray(deck.board) && deck.board.length === CELLS ? deck.board.map(okUnit) : autoFormation((deck.units || []).map(okUnit));
-  let placed = 0; board = board.map(id => (id && placed < DATA.rules.deckUnits ? (placed++, id) : null));
+  const limit = (b, n) => { let placed = 0; return b.map(id => (id && placed < n ? (placed++, id) : null)); };
+  board = limit(board, DATA.rules.deckUnits);
+  const board16 = limit(Array.isArray(deck.board16) && deck.board16.length === CELLS ? deck.board16.map(okUnit) : [...board], CELLS);
   const won = {}; Object.entries(s.won || {}).forEach(([k, v]) => { if (MISSIONS_BY_ID[k]) won[k] = clamp(Number(v) || 1, 1, 3); });
   return {
     v: 4, updatedAt: Number(s.updatedAt) || 0,
     credits: Math.max(0, Number(s.credits) || 0) + refund,
     boosters: nb,
     owned: Object.keys(owned).length ? owned : base.owned,
-    deck: { board },
-    won, seen: { ...(s.seen || {}) }, best: Math.max(0, Math.floor(Number(s.best) || 0)),
+    deck: { board, board16 },
+    won, seen: { ...(s.seen || {}) }, best: Math.max(0, Math.floor(Number(s.best) || 0)), best16: Math.max(0, Math.floor(Number(s.best16) || 0)),
     refunded: refund || 0,
   };
 }
