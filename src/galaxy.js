@@ -115,7 +115,7 @@ function renderPlanetPanel() {
   $('#gmNum').textContent = `Mission ${m.i} / ${P.list.length}${m.boss ? ' · boss de la planète' : m.chef ? ' · chef' : ''}`;
   $('#gmTitle').textContent = mTitle(m); $('#gmText').textContent = ok ? m.text[side] : 'Gagne la mission précédente pour débloquer celle-ci.';
   const reward = w ? `${Math.round(m.reward / 2)} crédits (rejouée)` : `${m.reward} crédits${m.boosters ? ` + ${m.boosters} booster${m.boosters > 1 ? 's' : ''}` : ''}`;
-  $('#gmMeta').innerHTML = `<span>${m.waves[side].length} vague${m.waves[side].length > 1 ? 's' : ''}</span><span>Ennemis niv. ${m.lvl}</span><span>${reward}</span><span class="st">${starStr(w)}</span>`;
+  $('#gmMeta').innerHTML = `<span>${m.waves[side].length} vague${m.waves[side].length > 1 ? 's' : ''}</span><span>Ennemis niv. ${foeLvlFor(m, save.deck.board)}</span><span>Autant d'ennemis que tes personnages</span><span>${reward}</span><span class="st">${starStr(w)}</span>`;
   const go2 = $('#gmGo'); go2.disabled = !ok; go2.textContent = ok ? (w ? 'Rejouer la mission' : 'Préparer la mission') : 'Verrouillée';
 }
 $('#gmGo').addEventListener('click', () => { if (gal.mission && missionOpen(gal.mission)) { sfx.click(); startPrep(gal.mission); } });

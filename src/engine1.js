@@ -150,10 +150,11 @@ const describe = d => unitRules(d);
    CAMPAGNE : missions générées à partir des données de chaque planète
    ================================================================ */
 const MISSIONS = [], MISSIONS_BY_ID = {};
+const missionPool = (P, i, side) => P.pools[side].slice(0, i <= 6 ? 1 : i <= 13 ? 2 : 3).flat();
 function buildWaves(P, M, i, side, chef) {
   const rnd = seeded(hashStr(`${P.id}${i}${side}`) % 233280);
   const nW = i <= 3 ? 1 : i <= 10 ? 2 : 3, size = Math.min(8, 2 + Math.ceil(i / 3));
-  const pool = P.pools[side].slice(0, i <= 6 ? 1 : i <= 13 ? 2 : 3).flat(), focus = (M.focus && M.focus[side]) || [];
+  const pool = missionPool(P, i, side), focus = (M.focus && M.focus[side]) || [];
   return Array.from({ length: nW }, (_, w) => {
     const list = Array.from({ length: Math.max(3, size - (nW - 1 - w)) }, () => pool[Math.floor(rnd() * pool.length)]);
     focus.forEach((id, k) => { if (k < list.length) list[k] = id; });
@@ -172,11 +173,25 @@ DATA.campaign.forEach((P, pi) => {
       reward: Math.round((40 + 5 * i) * (1 + 0.5 * pi)), boosters: i === 20 ? 2 : chef >= 0 ? 1 : 0,
     };
     m.waves = { light: buildWaves(P, M, i, 'light', chef), dark: buildWaves(P, M, i, 'dark', chef) };
+    m.pool = { light: missionPool(P, i, 'light'), dark: missionPool(P, i, 'dark') };
     P.list.push(m); MISSIONS.push(m); MISSIONS_BY_ID[m.id] = m;
   });
 });
 const planetDone = P => P.list.length > 0 && P.list.every(m => save.won[m.id]);
 const planetOpen = pi => pi === 0 || planetDone(DATA.campaign[pi - 1]);
+/* Les ennemis s'adaptent à l'escouade : au moins autant d'ennemis que de personnages
+   (un de plus face à un chef), et un niveau au moins égal à la moyenne de l'équipe */
+const teamLvl = board => { const ids = boardUnits(board); return ids.length ? Math.round(ids.reduce((a, id) => a + levelOf(id), 0) / ids.length) : 1; };
+const foeLvlFor = (m, board) => clamp(Math.max(m.lvl, teamLvl(board)), 1, DATA.rules.maxLevel);
+function fitWaves(m, sd, board) {
+  const n = boardUnits(board).length;
+  return m.waves[sd].map((base, w) => {
+    const chef = base.some(r => r.endsWith('!')), want = Math.min(DATA.rules.deckUnits, n + (chef ? 1 : 0));
+    const rnd = seeded(hashStr(`${m.id}${sd}${w}+`) % 233280), list = [...base];
+    while (list.length < want) list.push(m.pool[sd][Math.floor(rnd() * m.pool[sd].length)]);
+    return list;
+  });
+}
 const missionOpen = m => planetOpen(m.pi) && (m.i === 1 || !!save.won[`${m.planet}-${m.i - 1}`]);
 
 /* ================================================================

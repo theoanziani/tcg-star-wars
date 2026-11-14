@@ -82,7 +82,7 @@ function spawnFoes(list) {
   return autoFormation(list.map(r => r.replace('!', ''))).map((id, cell) => {
     if (!id) return null;
     const boss = !bossDone && id === bossId; if (boss) bossDone = true;
-    return new Unit(id, 'foe', cell, boss ? Math.min(5, mission.lvl + 1) : mission.lvl, boss);
+    return new Unit(id, 'foe', cell, boss ? Math.min(5, mission.foeLvl + 1) : mission.foeLvl, boss);
   }).filter(Boolean);
 }
 function emerge(u, delay, done) {
@@ -111,7 +111,8 @@ function startPrep(m) {
   mission = m; side = deckSide() === 'dark' ? 'dark' : 'light';
   clearScene(); applyPlanet(m.planet); state = 'prep'; waveIdx = 0;
   prepBoard = [...save.deck.board];
-  spawnAllies(prepBoard); foes = spawnFoes(m.waves[side][0]);
+  m.live = fitWaves(m, side, prepBoard); m.foeLvl = foeLvlFor(m, prepBoard);
+  spawnAllies(prepBoard); foes = spawnFoes(m.live[0]);
   go('prep');
   boardUnits(allies).forEach((a, i) => emerge(a, 0.1 + i * 0.1));
   foes.forEach((f, i) => emerge(f, 0.5 + i * 0.1));
@@ -127,13 +128,13 @@ function beginFight() {
   renderUlts(); go('battle'); state = 'opening'; $('.dock').hidden = false;
   units().forEach(u => { if (!u.ready) u.showNow(); });
   sfx.ignite(); if (units().some(u => u.model.saber)) sfx.humOn();
-  later(0.6, () => { showBanner(`Vague 1 / ${mission.waves[side].length}`); state = 'fight'; });
+  later(0.6, () => { showBanner(`Vague 1 / ${mission.live.length}`); state = 'fight'; });
   updateWaveLabel();
 }
 const startMission = m => startPrep(m);
 function nextWave() {
   state = 'transition'; clearBolts();
-  const waves = mission.waves[side];
+  const waves = mission.live;
   if (waveIdx + 1 >= waves.length) return win();
   waveIdx++;
   later(0.9, () => {
@@ -527,7 +528,7 @@ const FX = {
   },
   summon(u, k) {
     const cell = freeCell(u.side); if (cell == null || team(u.side).length >= DATA.rules.deckUnits) return false;
-    const id = SUMMON[u.def.side]; respawn(u.side, cell, id, 1, u.side === 'player' ? levelOf(id) || 1 : mission.lvl);
+    const id = SUMMON[u.def.side]; respawn(u.side, cell, id, 1, u.side === 'player' ? levelOf(id) || 1 : mission.foeLvl);
   },
   /* sur soi */
   hasteSelf(u, k) { u.st.haste = k.duration; aura(u, k.color); },
@@ -572,7 +573,7 @@ function tapUnit(x, y) {
 }
 function updateWaveLabel() {
   if (!mission) return;
-  $('#waveLabel').textContent = `${DATA.campaign[mission.pi].name} ${mission.i} · Vague ${waveIdx + 1} / ${mission.waves[side].length}`;
+  $('#waveLabel').textContent = `${DATA.campaign[mission.pi].name} ${mission.i} · Vague ${waveIdx + 1} / ${mission.live.length}`;
   const left = foes.filter(f => f.alive).length;
   $('#foesLabel').textContent = left ? `${left} ennemi${left > 1 ? 's' : ''} sur le plateau` : 'Vague repoussée';
 }

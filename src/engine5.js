@@ -163,12 +163,12 @@ $('#dAuto').addEventListener('click', () => { save.deck.board = autoFormation(bo
 
 /* --- Préparation avant combat --- */
 function renderPrep() {
-  const P = DATA.campaign[mission.pi], W2 = mission.waves[side];
+  const P = DATA.campaign[mission.pi], W2 = mission.live;
   $('#pTitle').textContent = `${P.name} ${mission.i} · ${mTitle(mission)}`;
   $('#pBrief').textContent = mission.text[side];
   const names = W2[0].map(r => CARDS[r.replace('!', '')].name), cnt = {};
   names.forEach(n => (cnt[n] = (cnt[n] || 0) + 1));
-  $('#pFoes').textContent = `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.lvl}. Vague 1 : ${Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ')}.${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
+  $('#pFoes').textContent = `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.foeLvl}, autant que tes personnages. Vague 1 : ${Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ')}.${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
   renderBoard($('#pBoard'), prepBoard, 'prep', b => rearrange(b));
   $('#pSave').disabled = prepBoard.every((id, i) => id === save.deck.board[i]);
 }

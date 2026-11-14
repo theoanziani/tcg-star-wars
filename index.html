@@ -1056,10 +1056,11 @@ const describe = d => unitRules(d);
    CAMPAGNE : missions générées à partir des données de chaque planète
    ================================================================ */
 const MISSIONS = [], MISSIONS_BY_ID = {};
+const missionPool = (P, i, side) => P.pools[side].slice(0, i <= 6 ? 1 : i <= 13 ? 2 : 3).flat();
 function buildWaves(P, M, i, side, chef) {
   const rnd = seeded(hashStr(`${P.id}${i}${side}`) % 233280);
   const nW = i <= 3 ? 1 : i <= 10 ? 2 : 3, size = Math.min(8, 2 + Math.ceil(i / 3));
-  const pool = P.pools[side].slice(0, i <= 6 ? 1 : i <= 13 ? 2 : 3).flat(), focus = (M.focus && M.focus[side]) || [];
+  const pool = missionPool(P, i, side), focus = (M.focus && M.focus[side]) || [];
   return Array.from({ length: nW }, (_, w) => {
     const list = Array.from({ length: Math.max(3, size - (nW - 1 - w)) }, () => pool[Math.floor(rnd() * pool.length)]);
     focus.forEach((id, k) => { if (k < list.length) list[k] = id; });
@@ -1078,11 +1079,25 @@ DATA.campaign.forEach((P, pi) => {
       reward: Math.round((40 + 5 * i) * (1 + 0.5 * pi)), boosters: i === 20 ? 2 : chef >= 0 ? 1 : 0,
     };
     m.waves = { light: buildWaves(P, M, i, 'light', chef), dark: buildWaves(P, M, i, 'dark', chef) };
+    m.pool = { light: missionPool(P, i, 'light'), dark: missionPool(P, i, 'dark') };
     P.list.push(m); MISSIONS.push(m); MISSIONS_BY_ID[m.id] = m;
   });
 });
 const planetDone = P => P.list.length > 0 && P.list.every(m => save.won[m.id]);
 const planetOpen = pi => pi === 0 || planetDone(DATA.campaign[pi - 1]);
+/* Les ennemis s'adaptent à l'escouade : au moins autant d'ennemis que de personnages
+   (un de plus face à un chef), et un niveau au moins égal à la moyenne de l'équipe */
+const teamLvl = board => { const ids = boardUnits(board); return ids.length ? Math.round(ids.reduce((a, id) => a + levelOf(id), 0) / ids.length) : 1; };
+const foeLvlFor = (m, board) => clamp(Math.max(m.lvl, teamLvl(board)), 1, DATA.rules.maxLevel);
+function fitWaves(m, sd, board) {
+  const n = boardUnits(board).length;
+  return m.waves[sd].map((base, w) => {
+    const chef = base.some(r => r.endsWith('!')), want = Math.min(DATA.rules.deckUnits, n + (chef ? 1 : 0));
+    const rnd = seeded(hashStr(`${m.id}${sd}${w}+`) % 233280), list = [...base];
+    while (list.length < want) list.push(m.pool[sd][Math.floor(rnd() * m.pool[sd].length)]);
+    return list;
+  });
+}
 const missionOpen = m => planetOpen(m.pi) && (m.i === 1 || !!save.won[`${m.planet}-${m.i - 1}`]);
 
 /* ================================================================
@@ -1979,7 +1994,7 @@ function spawnFoes(list) {
   return autoFormation(list.map(r => r.replace('!', ''))).map((id, cell) => {
     if (!id) return null;
     const boss = !bossDone && id === bossId; if (boss) bossDone = true;
-    return new Unit(id, 'foe', cell, boss ? Math.min(5, mission.lvl + 1) : mission.lvl, boss);
+    return new Unit(id, 'foe', cell, boss ? Math.min(5, mission.foeLvl + 1) : mission.foeLvl, boss);
   }).filter(Boolean);
 }
 function emerge(u, delay, done) {
@@ -2008,7 +2023,8 @@ function startPrep(m) {
   mission = m; side = deckSide() === 'dark' ? 'dark' : 'light';
   clearScene(); applyPlanet(m.planet); state = 'prep'; waveIdx = 0;
   prepBoard = [...save.deck.board];
-  spawnAllies(prepBoard); foes = spawnFoes(m.waves[side][0]);
+  m.live = fitWaves(m, side, prepBoard); m.foeLvl = foeLvlFor(m, prepBoard);
+  spawnAllies(prepBoard); foes = spawnFoes(m.live[0]);
   go('prep');
   boardUnits(allies).forEach((a, i) => emerge(a, 0.1 + i * 0.1));
   foes.forEach((f, i) => emerge(f, 0.5 + i * 0.1));
@@ -2024,13 +2040,13 @@ function beginFight() {
   renderUlts(); go('battle'); state = 'opening'; $('.dock').hidden = false;
   units().forEach(u => { if (!u.ready) u.showNow(); });
   sfx.ignite(); if (units().some(u => u.model.saber)) sfx.humOn();
-  later(0.6, () => { showBanner(`Vague 1 / ${mission.waves[side].length}`); state = 'fight'; });
+  later(0.6, () => { showBanner(`Vague 1 / ${mission.live.length}`); state = 'fight'; });
   updateWaveLabel();
 }
 const startMission = m => startPrep(m);
 function nextWave() {
   state = 'transition'; clearBolts();
-  const waves = mission.waves[side];
+  const waves = mission.live;
   if (waveIdx + 1 >= waves.length) return win();
   waveIdx++;
   later(0.9, () => {
@@ -2424,7 +2440,7 @@ const FX = {
   },
   summon(u, k) {
     const cell = freeCell(u.side); if (cell == null || team(u.side).length >= DATA.rules.deckUnits) return false;
-    const id = SUMMON[u.def.side]; respawn(u.side, cell, id, 1, u.side === 'player' ? levelOf(id) || 1 : mission.lvl);
+    const id = SUMMON[u.def.side]; respawn(u.side, cell, id, 1, u.side === 'player' ? levelOf(id) || 1 : mission.foeLvl);
   },
   /* sur soi */
   hasteSelf(u, k) { u.st.haste = k.duration; aura(u, k.color); },
@@ -2469,7 +2485,7 @@ function tapUnit(x, y) {
 }
 function updateWaveLabel() {
   if (!mission) return;
-  $('#waveLabel').textContent = `${DATA.campaign[mission.pi].name} ${mission.i} · Vague ${waveIdx + 1} / ${mission.waves[side].length}`;
+  $('#waveLabel').textContent = `${DATA.campaign[mission.pi].name} ${mission.i} · Vague ${waveIdx + 1} / ${mission.live.length}`;
   const left = foes.filter(f => f.alive).length;
   $('#foesLabel').textContent = left ? `${left} ennemi${left > 1 ? 's' : ''} sur le plateau` : 'Vague repoussée';
 }
@@ -2670,12 +2686,12 @@ $('#dAuto').addEventListener('click', () => { save.deck.board = autoFormation(bo
 
 /* --- Préparation avant combat --- */
 function renderPrep() {
-  const P = DATA.campaign[mission.pi], W2 = mission.waves[side];
+  const P = DATA.campaign[mission.pi], W2 = mission.live;
   $('#pTitle').textContent = `${P.name} ${mission.i} · ${mTitle(mission)}`;
   $('#pBrief').textContent = mission.text[side];
   const names = W2[0].map(r => CARDS[r.replace('!', '')].name), cnt = {};
   names.forEach(n => (cnt[n] = (cnt[n] || 0) + 1));
-  $('#pFoes').textContent = `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.lvl}. Vague 1 : ${Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ')}.${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
+  $('#pFoes').textContent = `${W2.length} vague${W2.length > 1 ? 's' : ''} · ennemis niveau ${mission.foeLvl}, autant que tes personnages. Vague 1 : ${Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ')}.${mission.chef ? ' Un chef attend à la dernière vague.' : ''}`;
   renderBoard($('#pBoard'), prepBoard, 'prep', b => rearrange(b));
   $('#pSave').disabled = prepBoard.every((id, i) => id === save.deck.board[i]);
 }
@@ -3175,7 +3191,7 @@ function renderPlanetPanel() {
   $('#gmNum').textContent = `Mission ${m.i} / ${P.list.length}${m.boss ? ' · boss de la planète' : m.chef ? ' · chef' : ''}`;
   $('#gmTitle').textContent = mTitle(m); $('#gmText').textContent = ok ? m.text[side] : 'Gagne la mission précédente pour débloquer celle-ci.';
   const reward = w ? `${Math.round(m.reward / 2)} crédits (rejouée)` : `${m.reward} crédits${m.boosters ? ` + ${m.boosters} booster${m.boosters > 1 ? 's' : ''}` : ''}`;
-  $('#gmMeta').innerHTML = `<span>${m.waves[side].length} vague${m.waves[side].length > 1 ? 's' : ''}</span><span>Ennemis niv. ${m.lvl}</span><span>${reward}</span><span class="st">${starStr(w)}</span>`;
+  $('#gmMeta').innerHTML = `<span>${m.waves[side].length} vague${m.waves[side].length > 1 ? 's' : ''}</span><span>Ennemis niv. ${foeLvlFor(m, save.deck.board)}</span><span>Autant d'ennemis que tes personnages</span><span>${reward}</span><span class="st">${starStr(w)}</span>`;
   const go2 = $('#gmGo'); go2.disabled = !ok; go2.textContent = ok ? (w ? 'Rejouer la mission' : 'Préparer la mission') : 'Verrouillée';
 }
 $('#gmGo').addEventListener('click', () => { if (gal.mission && missionOpen(gal.mission)) { sfx.click(); startPrep(gal.mission); } });
