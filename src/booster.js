@@ -142,7 +142,9 @@ const leak = new THREE.Mesh(new THREE.PlaneGeometry(PW, 0.05), additive('#ffe0a0
 /* --- État --- */
 const bo = { kind: 'perso', phase: 'idle', p: 0, dragX: null, cards: [], meshes: [], idx: 0, busy: false, legendT: 0, flash: 0, ptr: { x: 0, y: 0 }, summary: [] };
 function resizeBooster(a) {
-  bCam.aspect = a; bCam.fov = a < 0.62 ? 56 : a < 1.05 ? 48 : 40; bCam.position.z = a < 0.62 ? 6.8 : 6.2; bCam.updateProjectionMatrix();
+  /* écran bas (téléphone à l'horizontale) : on recule et on remonte le paquet au-dessus des boutons */
+  const short = H < 500;
+  bCam.aspect = a; bCam.fov = a < 0.62 ? 56 : a < 1.05 ? 48 : 40; bCam.position.z = short ? 8.6 : a < 0.62 ? 6.8 : 6.2; bCam.position.y = short ? -0.55 : 0.2; bCam.updateProjectionMatrix();
   bComposer.setSize(W, H);
 }
 function setPackKind(kind) {
